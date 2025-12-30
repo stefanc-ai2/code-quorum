@@ -67,6 +67,9 @@ msg() {
     wezterm_recommended)
       en_msg="Recommend installing WezTerm as terminal frontend"
       zh_msg="推荐安装 WezTerm 作为终端前端" ;;
+    root_error)
+      en_msg="ERROR: Do not run as root/sudo. Please run as normal user."
+      zh_msg="错误：请勿以 root/sudo 身份运行。请使用普通用户执行。" ;;
     *)
       en_msg="$key"
       zh_msg="$key" ;;
@@ -77,6 +80,12 @@ msg() {
     echo "$en_msg"
   fi
 }
+
+# Check for root/sudo - refuse to run as root
+if [[ "${EUID:-$(id -u)}" -eq 0 ]]; then
+  msg root_error >&2
+  exit 1
+fi
 
 SCRIPTS_TO_LINK=(
   bin/cask
