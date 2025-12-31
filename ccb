@@ -949,7 +949,10 @@ exec tmux attach -t "$TMUX_SESSION"
         print(f"Executing: {' '.join(cmd)}")
 
         try:
-            return subprocess.run(cmd, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr, env=env).returncode
+            # Let subprocess inherit stdio by default. Explicitly passing sys.stdin/out/err
+            # can produce non-console handles on Windows (especially after re-wrapping
+            # stdout/stderr for UTF-8), which may trigger issues in Node-based CLIs.
+            return subprocess.run(cmd, env=env).returncode
         except KeyboardInterrupt:
             print(f"\n⚠️ {t('user_interrupted')}")
             return 130
