@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import sys
 import time
 from pathlib import Path
@@ -35,12 +36,60 @@ def compute_opencode_project_id(work_dir: Path) -> str:
     except Exception:
         cwd = Path.cwd()
 
+    def _find_git_dir(start: Path) -> tuple[Path | None, Path | None]:
+        """
+        Return (git_root_dir, git_dir_path) if a .git entry is found.
+
+        Handles:
+        - normal repos: <root>/.git/ (directory)
+        - worktrees: <worktree>/.git (file containing "gitdir: <path>")
+        """
+        for candidate in [start, *start.parents]:
+            git_entry = candidate / ".git"
+            if not git_entry.exists():
+                continue
+            if git_entry.is_dir():
+                return candidate, git_entry
+            if git_entry.is_file():
+                try:
+                    raw = git_entry.read_text(encoding="utf-8", errors="replace").strip()
+                    prefix = "gitdir:"
+                    if raw.lower().startswith(prefix):
+                        gitdir = raw[len(prefix) :].strip()
+                        gitdir_path = Path(gitdir)
+                        if not gitdir_path.is_absolute():
+                            gitdir_path = (candidate / gitdir_path).resolve()
+                        return candidate, gitdir_path
+                except Exception:
+                    continue
+        return None, None
+
+    def _read_cached_project_id(git_dir: Path | None) -> str | None:
+        if not git_dir:
+            return None
+        try:
+            cache_path = git_dir / "opencode"
+            if not cache_path.exists():
+                return None
+            cached = cache_path.read_text(encoding="utf-8", errors="replace").strip()
+            return cached or None
+        except Exception:
+            return None
+
+    git_root, git_dir = _find_git_dir(cwd)
+    cached = _read_cached_project_id(git_dir)
+    if cached:
+        return cached
+
     try:
         import subprocess
 
+        if not shutil.which("git"):
+            return "global"
+
         proc = subprocess.run(
             ["git", "rev-list", "--max-parents=0", "--all"],
-            cwd=str(cwd),
+            cwd=str(git_root or cwd),
             text=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
@@ -80,6 +129,15 @@ def _path_is_same_or_parent(parent: str, child: str) -> bool:
     return child == parent or child[len(parent) :].startswith("/")
 
 
+def _is_wsl() -> bool:
+    if os.environ.get("WSL_INTEROP") or os.environ.get("WSL_DISTRO_NAME"):
+        return True
+    try:
+        return "microsoft" in Path("/proc/version").read_text(encoding="utf-8", errors="ignore").lower()
+    except Exception:
+        return False
+
+
 def _default_opencode_storage_root() -> Path:
     env = (os.environ.get("OPENCODE_STORAGE_ROOT") or "").strip()
     if env:
@@ -87,6 +145,9 @@ def _default_opencode_storage_root() -> Path:
 
     # Common defaults
     candidates: list[Path] = []
+    xdg_data_home = (os.environ.get("XDG_DATA_HOME") or "").strip()
+    if xdg_data_home:
+        candidates.append(Path(xdg_data_home) / "opencode" / "storage")
     candidates.append(Path.home() / ".local" / "share" / "opencode" / "storage")
 
     # Windows native (best-effort; OpenCode might not use this, but allow it if present)
@@ -96,6 +157,41 @@ def _default_opencode_storage_root() -> Path:
     appdata = os.environ.get("APPDATA")
     if appdata:
         candidates.append(Path(appdata) / "opencode" / "storage")
+    # Windows fallback when env vars are missing.
+    candidates.append(Path.home() / "AppData" / "Local" / "opencode" / "storage")
+    candidates.append(Path.home() / "AppData" / "Roaming" / "opencode" / "storage")
+
+    # WSL: OpenCode may run on Windows and store data under C:\Users\<name>\AppData\...\opencode\storage.
+    # Try common /mnt/c mappings.
+    if _is_wsl():
+        users_root = Path("/mnt/c/Users")
+        if users_root.exists():
+            preferred_names: list[str] = []
+            for k in ("WINUSER", "USERNAME", "USER"):
+                v = (os.environ.get(k) or "").strip()
+                if v and v not in preferred_names:
+                    preferred_names.append(v)
+            for name in preferred_names:
+                candidates.append(users_root / name / "AppData" / "Local" / "opencode" / "storage")
+                candidates.append(users_root / name / "AppData" / "Roaming" / "opencode" / "storage")
+
+            # If still not found, scan for any matching storage dir and pick the most recently modified.
+            found: list[Path] = []
+            try:
+                for user_dir in users_root.iterdir():
+                    if not user_dir.is_dir():
+                        continue
+                    for p in (
+                        user_dir / "AppData" / "Local" / "opencode" / "storage",
+                        user_dir / "AppData" / "Roaming" / "opencode" / "storage",
+                    ):
+                        if p.exists():
+                            found.append(p)
+            except Exception:
+                found = []
+            if found:
+                found.sort(key=lambda p: p.stat().st_mtime if p.exists() else 0.0, reverse=True)
+                candidates.insert(0, found[0])
 
     for candidate in candidates:
         try:
