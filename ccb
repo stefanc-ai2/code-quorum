@@ -1085,14 +1085,14 @@ exec tmux attach -t "$TMUX_SESSION"
 
         cmd = [claude_cmd]
 
-        if self.auto:
-            # Auto mode: bypass all permissions (incompatible with plan mode)
+        # Check for .autoflow folder in current directory (CCA project)
+        autoflow_dir = Path.cwd() / ".autoflow"
+        if autoflow_dir.is_dir():
+            # CCA project detected: use plan mode regardless of -a flag
+            cmd.extend(["--permission-mode", "plan"])
+        elif self.auto:
+            # Auto mode without CCA: bypass all permissions
             cmd.append("--dangerously-skip-permissions")
-        else:
-            # If CCA (Claude Code Autoflow) is installed, start Claude in plan mode
-            cca_path, _ = _detect_cca()
-            if cca_path:
-                cmd.extend(["--permission-mode", "plan"])
         if self.resume:
             _, has_history = self._get_latest_claude_session_id()
             if has_history:

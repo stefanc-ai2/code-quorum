@@ -1,6 +1,6 @@
 <div align="center">
 
-# Claude Code Bridge (ccb) v2.3.7
+# Claude Code Bridge (ccb) v2.3.8
 
 **Silky Smooth Claude & Codex & Gemini Collaboration via Split-Pane Terminal**
 
@@ -15,7 +15,7 @@
   <img src="https://img.shields.io/badge/Every_Model_Controllable-CF1322?style=for-the-badge" alt="Every Model Controllable">
 </p>
 
-[![Version](https://img.shields.io/badge/version-2.3.7-orange.svg)]()
+[![Version](https://img.shields.io/badge/version-2.3.8-orange.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg)]()
@@ -297,6 +297,10 @@ Once started, collaborate naturally. Claude will detect when to delegate tasks.
 
 <details>
 <summary><b>Version History</b></summary>
+
+### v2.3.8
+- Simplify CCA detection: check for `.autoflow` folder in current directory
+- Plan mode enabled for CCA projects regardless of `-a` flag
 
 ### v2.3.7
 - Per-directory lock: different working directories can run cask/gask/oask independently
