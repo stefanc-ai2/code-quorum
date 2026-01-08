@@ -195,6 +195,13 @@ def _build_keep_open_cmd(provider: str, start_cmd: str) -> str:
     )
 
 
+def _build_pane_title_cmd(marker: str) -> str:
+    if get_shell_type() == "powershell":
+        safe = marker.replace("'", "''")
+        return f"$Host.UI.RawUI.WindowTitle = '{safe}'; "
+    return f"printf '\\033]0;{marker}\\007'; "
+
+
 class AILauncher:
     def __init__(self, providers: list, resume: bool = False, auto: bool = False, no_claude: bool = False):
         self.providers = providers or ["codex"]
@@ -343,7 +350,7 @@ class AILauncher:
                     parent_pane = None
 
         pane_title_marker = f"CCB-{provider}-{self.session_id[:12]}"
-        title_cmd = f"printf '\\033]0;{pane_title_marker}\\007'; "
+        title_cmd = _build_pane_title_cmd(pane_title_marker)
         full_cmd = title_cmd + start_cmd
         backend = WeztermBackend()
         pane_id = backend.create_pane(full_cmd, str(Path.cwd()), direction=direction, percent=50, parent_pane=parent_pane)
