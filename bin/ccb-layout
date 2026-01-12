@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
 ccb-layout - Start a 2x2 four-AI layout (Claude + Codex + Gemini + OpenCode).
 
