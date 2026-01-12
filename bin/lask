@@ -22,7 +22,7 @@ script_dir = Path(__file__).resolve().parent
 lib_dir = script_dir.parent / "lib"
 sys.path.insert(0, str(lib_dir))
 
-from compat import setup_windows_encoding
+from compat import read_stdin_text, setup_windows_encoding
 
 setup_windows_encoding()
 
@@ -77,7 +77,7 @@ def main(argv: list[str]) -> int:
 
     message = " ".join(argv[1:]).strip() if len(argv) > 1 else ""
     if not message and not sys.stdin.isatty():
-        message = sys.stdin.read().strip()
+        message = read_stdin_text().strip()
     if not message:
         _usage()
         return 1

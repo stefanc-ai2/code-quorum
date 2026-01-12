@@ -18,7 +18,7 @@ script_dir = Path(__file__).resolve().parent
 lib_dir = script_dir.parent / "lib"
 sys.path.insert(0, str(lib_dir))
 
-from compat import setup_windows_encoding
+from compat import read_stdin_text, setup_windows_encoding
 
 setup_windows_encoding()
 
@@ -121,7 +121,7 @@ def main(argv: list[str]) -> int:
     try:
         output_path, timeout, message, quiet = _parse_args(argv)
         if not message and not sys.stdin.isatty():
-            message = sys.stdin.read().strip()
+            message = read_stdin_text().strip()
         if not message:
             _usage()
             return EXIT_ERROR
