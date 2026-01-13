@@ -58,6 +58,10 @@ def resolve_work_dir(
     if not session_path.is_file():
         raise ValueError(f"Session file must be a file: {session_path}")
 
+    # New layout: session files live under `<project>/.ccb_config/<session_filename>`.
+    # In that case work_dir is the parent directory of `.ccb_config/`.
+    if session_path.parent.name == ".ccb_config":
+        return session_path.parent.parent, session_path
     return session_path.parent, session_path
 
 

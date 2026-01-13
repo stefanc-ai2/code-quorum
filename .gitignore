@@ -4,6 +4,7 @@ __pycache__/
 .pytest_cache/
 docs/
 tests/
+.ccb_config/
 .codex-session
 .gemini-session
 .claude-session

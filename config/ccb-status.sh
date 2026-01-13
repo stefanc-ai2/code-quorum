@@ -45,11 +45,19 @@ check_session() {
     local session_file
 
     case "$name" in
-        claude)  session_file="$PWD/.claude-session" ;;
-        codex)   session_file="$PWD/.codex-session" ;;
-        gemini)  session_file="$PWD/.gemini-session" ;;
-        opencode) session_file="$PWD/.opencode-session" ;;
+        claude)  session_file="$PWD/.ccb_config/.claude-session" ;;
+        codex)   session_file="$PWD/.ccb_config/.codex-session" ;;
+        gemini)  session_file="$PWD/.ccb_config/.gemini-session" ;;
+        opencode) session_file="$PWD/.ccb_config/.opencode-session" ;;
     esac
+
+    # Backwards compatibility: older versions stored session files in project root.
+    if [[ -n "$session_file" && ! -f "$session_file" ]]; then
+        local legacy="${session_file/.ccb_config\\//}"
+        if [[ -f "$legacy" ]]; then
+            session_file="$legacy"
+        fi
+    fi
 
     if [[ -f "$session_file" ]]; then
         echo "active"

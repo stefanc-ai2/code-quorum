@@ -330,7 +330,7 @@ class SessionRegistry:
             if entry:
                 # If the session entry is invalid but the session file was updated (e.g. new pane info),
                 # reload and re-validate so we can recover.
-                session_file = entry.session_file or find_project_session_file(work_dir) or (work_dir / ".codex-session")
+                session_file = entry.session_file or find_project_session_file(work_dir) or (work_dir / ".ccb_config" / ".codex-session")
                 if session_file.exists():
                     try:
                         current_mtime = session_file.stat().st_mtime
@@ -351,7 +351,7 @@ class SessionRegistry:
 
     def _load_and_cache(self, work_dir: Path) -> Optional[_SessionEntry]:
         session = load_project_session(work_dir)
-        session_file = session.session_file if session else (find_project_session_file(work_dir) or (work_dir / ".codex-session"))
+        session_file = session.session_file if session else (find_project_session_file(work_dir) or (work_dir / ".ccb_config" / ".codex-session"))
         mtime = 0.0
         if session_file.exists():
             try:

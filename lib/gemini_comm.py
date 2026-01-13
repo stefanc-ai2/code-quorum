@@ -551,9 +551,12 @@ class GeminiCommunicator:
     def _find_session_file(self) -> Optional[Path]:
         current = Path.cwd()
         while current != current.parent:
-            candidate = current / ".gemini-session"
+            candidate = current / ".ccb_config" / ".gemini-session"
             if candidate.exists():
                 return candidate
+            legacy = current / ".gemini-session"
+            if legacy.exists():
+                return legacy
             current = current.parent
         return None
 

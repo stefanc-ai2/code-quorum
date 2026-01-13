@@ -20,10 +20,16 @@ from i18n import t
 
 def _load_project_id() -> str:
     """Load project_id from .opencode-session or compute from cwd"""
-    session_file = Path.cwd() / '.opencode-session'
     work_dir = Path.cwd()
 
-    if session_file.exists():
+    try:
+        from session_utils import find_project_session_file
+    except Exception:
+        find_project_session_file = None
+
+    session_file = find_project_session_file(Path.cwd(), ".opencode-session") if find_project_session_file else (Path.cwd() / ".opencode-session")
+
+    if session_file and session_file.exists():
         try:
             with session_file.open('r', encoding='utf-8-sig') as f:
                 data = json.load(f)

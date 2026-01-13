@@ -38,7 +38,7 @@ backend_env = get_backend_env()
 if backend_env and not os.environ.get("CCB_BACKEND_ENV"):
     os.environ["CCB_BACKEND_ENV"] = backend_env
 
-VERSION = "4.0.0"
+VERSION = "4.0.3"
 GIT_COMMIT = ""
 GIT_DATE = ""
 
@@ -522,6 +522,43 @@ class AILauncher:
         self.tmux_panes = {}
         self.wezterm_panes = {}
         self.processes = {}
+        self._migrate_legacy_project_files()
+
+    def _project_config_dir(self) -> Path:
+        return Path.cwd() / ".ccb_config"
+
+    def _project_session_file(self, filename: str) -> Path:
+        cfg = self._project_config_dir()
+        cfg.mkdir(parents=True, exist_ok=True)
+        return cfg / filename
+
+    def _migrate_legacy_project_files(self) -> None:
+        """
+        Move legacy project dotfiles from the project root into `.ccb_config/`.
+
+        This keeps the project root clean while preserving backwards-compatible lookup
+        (see `lib/session_utils.py:find_project_session_file`).
+        """
+        try:
+            cfg = self._project_config_dir()
+            cfg.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            return
+
+        for name in (".codex-session", ".gemini-session", ".opencode-session", ".claude-session"):
+            legacy = Path.cwd() / name
+            if not legacy.exists():
+                continue
+            try:
+                target = cfg / name
+                if not target.exists():
+                    legacy.replace(target)
+                    continue
+                # Keep both, but move the legacy one under `.ccb_config/` with a suffix.
+                suffix = time.strftime("%Y%m%d%H%M%S")
+                legacy.replace(cfg / f"{name}.legacy.{suffix}")
+            except Exception:
+                pass
 
     def _maybe_start_caskd(self) -> None:
         def _bool_from_env(name: str):
@@ -912,6 +949,7 @@ class AILauncher:
 
     def _write_json_file(self, path: Path, data: dict) -> None:
         try:
+            path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
         except Exception:
             pass
@@ -932,7 +970,7 @@ class AILauncher:
             return data if isinstance(data, dict) else {}
 
     def _claude_session_file(self) -> Path:
-        return Path.cwd() / ".claude-session"
+        return self._project_session_file(".claude-session")
 
     def _read_local_claude_session_id(self) -> str | None:
         data = self._read_json_file(self._claude_session_file())
@@ -972,7 +1010,7 @@ class AILauncher:
         Always scans session logs to find the latest session for current cwd,
         then updates local .codex-session file.
         """
-        project_session = Path.cwd() / ".codex-session"
+        project_session = self._project_session_file(".codex-session")
 
         # Always scan Codex session logs for the latest session bound to this cwd.
         # This ensures we get the latest session even if user did /clear during run.
@@ -1028,64 +1066,115 @@ class AILauncher:
 
     def _ensure_codex_auto_approval(self) -> None:
         """Auto-configure codex approval policy for current directory when -a flag is used."""
+        import re
+
         codex_config = Path.home() / ".codex" / "config.toml"
         if not codex_config.exists():
             return
 
+        def _toml_escape_basic_string(value: str) -> str:
+            return (value or "").replace("\\", "\\\\").replace('"', '\\"')
+
         cwd = str(Path.cwd())
-        section_header = f'[projects."{cwd}"]'
+        section_header = f'[projects."{_toml_escape_basic_string(cwd)}"]'
+
+        ccb_begin = "# --- BEGIN CCB: codex auto-approval ---"
+        ccb_end = "# --- END CCB: codex auto-approval ---"
+        desired = [
+            'trust_level = "trusted"',
+            'approval_policy = "never"',
+            'sandbox_mode = "full-auto"',
+        ]
 
         try:
             content = codex_config.read_text(encoding="utf-8")
 
-            if section_header in content:
-                lines = content.split("\n")
-                new_lines = []
-                i = 0
-                while i < len(lines):
-                    line = lines[i]
-                    new_lines.append(line)
+            def _section_bounds(text: str, header: str) -> tuple[int, int] | None:
+                m = re.search(rf"(?m)^{re.escape(header)}\\s*$", text)
+                if not m:
+                    return None
+                start = m.start()
+                tail = text[m.end() :]
+                n = re.search(r"(?m)^\\[", tail)
+                end = m.end() + (n.start() if n else len(tail))
+                return start, end
 
-                    if line.strip() == section_header:
-                        has_trust = False
-                        has_approval = False
-                        has_sandbox = False
+            def _has_key(section_text: str, key: str) -> bool:
+                return re.search(rf"(?m)^\\s*{re.escape(key)}\\s*=", section_text) is not None
 
-                        j = i + 1
-                        section_end = j
-                        while j < len(lines):
-                            next_line = lines[j].strip()
-                            if next_line.startswith("["):
-                                break
-                            if next_line.startswith("trust_level"):
-                                has_trust = True
-                            if next_line.startswith("approval_policy"):
-                                has_approval = True
-                            if next_line.startswith("sandbox_mode"):
-                                has_sandbox = True
-                            section_end = j + 1
-                            j += 1
+            def _ensure_block(section_text: str) -> tuple[str, bool]:
+                lines = section_text.splitlines(keepends=True)
+                changed = False
 
-                        for k in range(i + 1, section_end):
-                            new_lines.append(lines[k])
+                try:
+                    header_idx = next(i for i, ln in enumerate(lines) if ln.strip() == section_header)
+                except StopIteration:
+                    return section_text, False
 
-                        if not has_trust:
-                            new_lines.append('trust_level = "trusted"')
-                        if not has_approval:
-                            new_lines.append('approval_policy = "never"')
-                        if not has_sandbox:
-                            new_lines.append('sandbox_mode = "full-auto"')
+                begin_idx = None
+                end_idx = None
+                for i, ln in enumerate(lines):
+                    if ln.strip() == ccb_begin:
+                        begin_idx = i
+                    if ln.strip() == ccb_end:
+                        end_idx = i
+                        break
 
-                        i = section_end - 1
-                    i += 1
+                missing = [ln for ln in desired if not _has_key(section_text, ln.split("=", 1)[0].strip())]
+                if not missing and begin_idx is None and end_idx is None:
+                    # If the keys already exist (likely added previously), wrap them with markers (best-effort)
+                    # so future diffs stay localized. Keep it conservative: only wrap if span is small.
+                    key_re = re.compile(r"^\\s*(trust_level|approval_policy|sandbox_mode)\\s*=")
+                    key_lines = [i for i, ln in enumerate(lines) if key_re.search(ln)]
+                    if key_lines:
+                        span = max(key_lines) - min(key_lines)
+                        if span <= 12:
+                            insert_before = min(key_lines)
+                            insert_after = max(key_lines) + 1
+                            lines.insert(insert_before, ccb_begin + "\n")
+                            lines.insert(insert_after + 1, ccb_end + "\n")
+                            changed = True
+                    return "".join(lines), changed
 
-                content = "\n".join(new_lines)
+                if not missing:
+                    return section_text, False
+
+                block_lines = [ccb_begin + "\n", *[m + "\n" for m in missing], ccb_end + "\n"]
+
+                if begin_idx is not None and end_idx is not None and begin_idx < end_idx:
+                    # Insert missing keys right before end marker.
+                    lines[end_idx:end_idx] = [m + "\n" for m in missing]
+                    changed = True
+                    return "".join(lines), changed
+
+                # No existing block: append a new CCB-managed block at end of this section.
+                insert_at = len(lines)
+                while insert_at > 0 and lines[insert_at - 1].strip() == "":
+                    insert_at -= 1
+                if insert_at > 0 and lines[insert_at - 1].strip() != "":
+                    block_lines.insert(0, "\n")
+                lines[insert_at:insert_at] = block_lines
+                changed = True
+                return "".join(lines), changed
+
+            changed_any = False
+            bounds = _section_bounds(content, section_header)
+            if bounds:
+                start, end = bounds
+                section = content[start:end]
+                updated_section, changed = _ensure_block(section)
+                if changed:
+                    content = content[:start] + updated_section + content[end:]
+                    changed_any = True
             else:
-                new_section = f'\n{section_header}\ntrust_level = "trusted"\napproval_policy = "never"\nsandbox_mode = "full-auto"\n'
-                content = content.rstrip() + new_section
+                # No existing section: append a new CCB-managed project section at end of file.
+                entry = "\n".join([section_header, ccb_begin, *desired, ccb_end]) + "\n"
+                content = content.rstrip() + "\n\n" + entry
+                changed_any = True
 
-            codex_config.write_text(content, encoding="utf-8")
-            print(f"✅ Codex auto-approval configured for: {cwd}")
+            if changed_any:
+                codex_config.write_text(content, encoding="utf-8")
+                print(f"✅ Codex auto-approval configured for: {cwd}")
         except Exception as e:
             print(f"⚠️ Failed to configure codex auto-approval: {e}")
 
@@ -1452,7 +1541,7 @@ class AILauncher:
         return True
 
     def _write_codex_session(self, runtime, tmux_session, input_fifo, output_fifo, pane_id=None, pane_title_marker=None, codex_start_cmd=None):
-        session_file = Path.cwd() / ".codex-session"
+        session_file = self._project_session_file(".codex-session")
 
         # Pre-check permissions
         writable, reason, fix = check_session_writable(session_file)
@@ -1510,7 +1599,7 @@ class AILauncher:
         return ok
 
     def _write_gemini_session(self, runtime, tmux_session, pane_id=None, pane_title_marker=None, start_cmd=None):
-        session_file = Path.cwd() / ".gemini-session"
+        session_file = self._project_session_file(".gemini-session")
 
         # Pre-check permissions
         writable, reason, fix = check_session_writable(session_file)
@@ -1539,7 +1628,7 @@ class AILauncher:
         return True
 
     def _write_opencode_session(self, runtime, tmux_session, pane_id=None, pane_title_marker=None, start_cmd=None):
-        session_file = Path.cwd() / ".opencode-session"
+        session_file = self._project_session_file(".opencode-session")
 
         writable, reason, fix = check_session_writable(session_file)
         if not writable:
@@ -1784,7 +1873,12 @@ class AILauncher:
                 if pane_id:
                     backend.kill_pane(pane_id)
 
-        for session_file in [Path.cwd() / ".codex-session", Path.cwd() / ".gemini-session", Path.cwd() / ".opencode-session", Path.cwd() / ".claude-session"]:
+        for session_file in [
+            self._project_session_file(".codex-session"),
+            self._project_session_file(".gemini-session"),
+            self._project_session_file(".opencode-session"),
+            self._project_session_file(".claude-session"),
+        ]:
             if session_file.exists():
                 try:
                     data = self._read_json_file(session_file)

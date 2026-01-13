@@ -8,6 +8,13 @@ from pathlib import Path
 from typing import Tuple, Optional
 
 
+CCB_PROJECT_CONFIG_DIRNAME = ".ccb_config"
+
+
+def project_config_dir(work_dir: Path) -> Path:
+    return Path(work_dir).resolve() / CCB_PROJECT_CONFIG_DIRNAME
+
+
 def check_session_writable(session_file: Path) -> Tuple[bool, Optional[str], Optional[str]]:
     """
     Check if session file is writable
@@ -121,9 +128,14 @@ def print_session_error(msg: str, to_stderr: bool = True) -> None:
 def find_project_session_file(work_dir: Path, session_filename: str) -> Optional[Path]:
     current = Path(work_dir).resolve()
     while True:
-        candidate = current / session_filename
+        # New location: keep project root clean by storing session files under `.ccb_config/`.
+        candidate = current / CCB_PROJECT_CONFIG_DIRNAME / session_filename
         if candidate.exists():
             return candidate
+        # Legacy location: `<work_dir>/.codex-session` etc.
+        legacy = current / session_filename
+        if legacy.exists():
+            return legacy
         if current == current.parent:
             return None
         current = current.parent

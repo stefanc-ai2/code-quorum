@@ -674,9 +674,12 @@ class CodexCommunicator:
     def _find_session_file(self) -> Optional[Path]:
         current = Path.cwd()
         while current != current.parent:
-            candidate = current / ".codex-session"
+            candidate = current / ".ccb_config" / ".codex-session"
             if candidate.exists():
                 return candidate
+            legacy = current / ".codex-session"
+            if legacy.exists():
+                return legacy
             current = current.parent
         return None
 

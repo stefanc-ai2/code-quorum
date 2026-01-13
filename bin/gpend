@@ -19,6 +19,7 @@ from i18n import t
 try:
     from cli_output import EXIT_ERROR, EXIT_NO_REPLY, EXIT_OK
     from gemini_comm import GeminiLogReader
+    from session_utils import find_project_session_file
 except ImportError as exc:
     print(f"Import failed: {exc}")
     sys.exit(1)
@@ -35,9 +36,9 @@ def _debug(message: str) -> None:
 
 
 def _load_session_path() -> Path | None:
-    """Load gemini_session_path from .gemini-session if exists"""
-    session_file = Path.cwd() / ".gemini-session"
-    if not session_file.exists():
+    """Load gemini_session_path from .gemini-session (or .ccb_config/.gemini-session) if exists"""
+    session_file = find_project_session_file(Path.cwd(), ".gemini-session")
+    if not session_file:
         return None
     try:
         with session_file.open("r", encoding="utf-8-sig") as f:
@@ -52,8 +53,8 @@ def _load_session_path() -> Path | None:
 
 def _update_session_file(actual_session: Path) -> None:
     """Update .gemini-session with actual session path if different"""
-    session_file = Path.cwd() / ".gemini-session"
-    if not session_file.exists():
+    session_file = find_project_session_file(Path.cwd(), ".gemini-session")
+    if not session_file:
         return
     try:
         with session_file.open("r", encoding="utf-8") as f:

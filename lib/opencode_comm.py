@@ -1015,9 +1015,12 @@ class OpenCodeCommunicator:
     def _find_session_file(self) -> Optional[Path]:
         current = Path.cwd()
         while current != current.parent:
-            candidate = current / ".opencode-session"
+            candidate = current / ".ccb_config" / ".opencode-session"
             if candidate.exists():
                 return candidate
+            legacy = current / ".opencode-session"
+            if legacy.exists():
+                return legacy
             current = current.parent
         return None
 
