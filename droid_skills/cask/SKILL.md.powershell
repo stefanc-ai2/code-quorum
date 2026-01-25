@@ -14,9 +14,10 @@ Send the user’s request to Codex asynchronously.
 ## Execution (MANDATORY)
 
 ```
-Bash(@"
+Bash(cask <<'EOF'
 $ARGUMENTS
-"@ | cask, run_in_background=true)
+EOF
+, run_in_background=true)
 ```
 
 ## Rules

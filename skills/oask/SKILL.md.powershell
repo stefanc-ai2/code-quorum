@@ -14,9 +14,10 @@ Send the user’s request to OpenCode asynchronously.
 ## Execution (MANDATORY)
 
 ```
-Bash(@"
+Bash(oask <<'EOF'
 $ARGUMENTS
-"@ | oask, run_in_background=true)
+EOF
+, run_in_background=true)
 ```
 
 ## Rules

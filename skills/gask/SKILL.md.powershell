@@ -14,9 +14,10 @@ Send the user’s request to Gemini asynchronously.
 ## Execution (MANDATORY)
 
 ```
-Bash(@"
+Bash(gask <<'EOF'
 $ARGUMENTS
-"@ | gask, run_in_background=true)
+EOF
+, run_in_background=true)
 ```
 
 ## Rules

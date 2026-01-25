@@ -2144,6 +2144,23 @@ class AILauncher:
             except Exception:
                 pass
 
+        # Windows 下全局安装的 codex-cli 常见形态是 npm 的 shim（`codex.cmd`）。
+        # Python 的 subprocess 在传入 argv 列表时会走 CreateProcess，无法像 shell 一样解析 `.cmd`，
+        # 因而会触发 [WinError 2] 找不到可执行文件。这里改为通过 shell 执行以确保可启动。
+        if os.name == "nt":
+            env = self._with_bin_path_env()
+            env.update(self._managed_env_overrides())
+            env["CODEX_SESSION_ID"] = self.session_id
+            env["CODEX_RUNTIME_DIR"] = str(runtime)
+            env["CODEX_INPUT_FIFO"] = str(input_fifo)
+            env["CODEX_OUTPUT_FIFO"] = str(output_fifo)
+            env["CODEX_TERMINAL"] = self.terminal_type
+            if self.terminal_type == "wezterm":
+                env["CODEX_WEZTERM_PANE"] = pane_id
+            else:
+                env["CODEX_TMUX_SESSION"] = pane_id
+            return self._run_shell_command(self._build_codex_start_cmd(), env=env, cwd=str(Path.cwd()))
+
         cmd_parts = shlex.split(self._build_codex_start_cmd())
         env = self._with_bin_path_env()
         env.update(self._managed_env_overrides())
