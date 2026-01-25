@@ -1,0 +1,225 @@
+#!/usr/bin/env python3
+"""
+CCB Completion Hook - Notifies Claude when a CCB delegation task completes.
+
+This script is called by caskd/gaskd/oaskd/daskd when they detect CCB_DONE signal.
+It sends a notification to Claude via lask to trigger auto-retrieval of results.
+
+Usage:
+    ccb-completion-hook.py --provider <provider> --output <output_file> [--reply <reply_text>]
+
+Environment:
+    CCB_COMPLETION_HOOK_ENABLED: Set to "0" to disable (default: "1")
+    CCB_COMPLETION_HOOK_TIMEOUT: Timeout in seconds (default: 5)
+"""
+
+from __future__ import annotations
+
+import argparse
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+
+def env_bool(name: str, default: bool = True) -> bool:
+    val = os.environ.get(name, "").strip().lower()
+    if not val:
+        return default
+    return val not in ("0", "false", "no", "off")
+
+
+def env_float(name: str, default: float) -> float:
+    val = os.environ.get(name, "").strip()
+    if not val:
+        return default
+    try:
+        return float(val)
+    except ValueError:
+        return default
+
+
+def main() -> int:
+    if not env_bool("CCB_COMPLETION_HOOK_ENABLED", True):
+        return 0
+
+    parser = argparse.ArgumentParser(description="CCB Completion Hook")
+    parser.add_argument("--provider", required=True, help="Provider name (codex/gemini/opencode/droid)")
+    parser.add_argument("--caller", default="claude", help="Who initiated the request (claude/codex/droid)")
+    parser.add_argument("--output", default="", help="Output file path (optional)")
+    parser.add_argument("--reply", default="", help="Reply text (optional)")
+    parser.add_argument("--req-id", default="", help="Request ID")
+    args = parser.parse_args()
+
+    provider = args.provider.lower()
+    caller = args.caller.lower()
+    output_file = args.output or None
+    reply_preview = (args.reply or "")[:200]
+
+    # Construct notification message
+    provider_names = {
+        "codex": "Codex",
+        "gemini": "Gemini",
+        "opencode": "OpenCode",
+        "droid": "Droid",
+    }
+    provider_display = provider_names.get(provider, provider.capitalize())
+    req_id = args.req_id or "unknown"
+
+    if output_file:
+        message = f"""CCB_REQ_ID: {req_id}
+
+[CCB_TASK_COMPLETED]
+Provider: {provider_display}
+Output file: {output_file}
+
+Result preview: {reply_preview}
+"""
+    else:
+        message = f"""CCB_REQ_ID: {req_id}
+
+[CCB_TASK_COMPLETED]
+Provider: {provider_display}
+
+Result: {reply_preview}
+"""
+
+    # Find caller's pane_id from session file
+    session_files = {
+        "claude": ".claude-session",
+        "codex": ".codex-session",
+        "droid": ".droid-session",
+    }
+    session_filename = session_files.get(caller, ".claude-session")
+
+    # Search for session file in common locations
+    work_dir = os.environ.get("CCB_WORK_DIR", os.getcwd())
+    search_paths = [
+        Path(work_dir) / ".ccb_config" / session_filename,
+        Path.home() / ".local" / "share" / "codex-dual" / ".ccb_config" / session_filename,
+    ]
+
+    pane_id = None
+    for session_path in search_paths:
+        if session_path.exists():
+            try:
+                import json
+                with open(session_path) as f:
+                    data = json.load(f)
+                pane_id = data.get("pane_id")
+                if pane_id:
+                    break
+            except Exception:
+                continue
+
+    if not pane_id:
+        # No pane_id found, try ask command with full path
+        timeout = env_float("CCB_COMPLETION_HOOK_TIMEOUT", 10.0)
+        ask_paths = [
+            Path(__file__).resolve().parent / "ask",
+            Path.home() / ".local" / "share" / "codex-dual" / "bin" / "ask",
+            Path.home() / ".local" / "bin" / "ask",
+        ]
+        ask_cmd = None
+        for p in ask_paths:
+            if p.exists():
+                ask_cmd = str(p)
+                break
+        if not ask_cmd:
+            return 0
+        try:
+            result = subprocess.run(
+                [ask_cmd, caller, "--notify", "--no-wrap", message],
+                capture_output=True,
+                text=True,
+                timeout=timeout
+            )
+            return result.returncode
+        except Exception:
+            return 0
+
+    # Send directly via tmux using load-buffer + paste-buffer for multiline text
+    try:
+        import time
+
+        # Ensure pane is not in copy mode
+        try:
+            mode_result = subprocess.run(
+                ["tmux", "display-message", "-p", "-t", pane_id, "#{pane_in_mode}"],
+                capture_output=True,
+                text=True,
+                timeout=2
+            )
+            if mode_result.returncode == 0 and mode_result.stdout.strip() in ("1", "on", "yes"):
+                subprocess.run(
+                    ["tmux", "send-keys", "-t", pane_id, "-X", "cancel"],
+                    capture_output=True,
+                    timeout=2
+                )
+        except Exception:
+            pass
+
+        buffer_name = f"ccb-hook-{os.getpid()}-{int(time.time() * 1000)}"
+        # Load message into tmux buffer
+        load_result = subprocess.run(
+            ["tmux", "load-buffer", "-b", buffer_name, "-"],
+            input=message.encode("utf-8"),
+            capture_output=True,
+            timeout=5
+        )
+        if load_result.returncode != 0:
+            raise Exception("load-buffer failed")
+        try:
+            # Paste buffer to pane
+            paste_result = subprocess.run(
+                ["tmux", "paste-buffer", "-p", "-t", pane_id, "-b", buffer_name],
+                capture_output=True,
+                timeout=5
+            )
+            if paste_result.returncode == 0:
+                # Send Enter after paste (wait 1s for stability)
+                time.sleep(1.0)
+                subprocess.run(
+                    ["tmux", "send-keys", "-t", pane_id, "Enter"],
+                    capture_output=True,
+                    timeout=5
+                )
+                return 0
+        finally:
+            # Clean up buffer
+            subprocess.run(
+                ["tmux", "delete-buffer", "-b", buffer_name],
+                capture_output=True,
+                timeout=2
+            )
+    except Exception:
+        pass
+
+    # Fallback to ask command if tmux failed
+    timeout = env_float("CCB_COMPLETION_HOOK_TIMEOUT", 10.0)
+    ask_paths = [
+        Path(__file__).resolve().parent / "ask",
+        Path.home() / ".local" / "share" / "codex-dual" / "bin" / "ask",
+        Path.home() / ".local" / "bin" / "ask",
+    ]
+    ask_cmd = None
+    for p in ask_paths:
+        if p.exists():
+            ask_cmd = str(p)
+            break
+    if not ask_cmd:
+        return 0
+    try:
+        subprocess.run(
+            [ask_cmd, caller, "--notify", "--no-wrap", message],
+            capture_output=True,
+            text=True,
+            timeout=timeout
+        )
+    except Exception:
+        pass
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

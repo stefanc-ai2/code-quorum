@@ -155,7 +155,15 @@ def state_file_from_env(env_name: str) -> Optional[Path]:
         return None
 
 
-def try_daemon_request(spec: ProviderClientSpec, work_dir: Path, message: str, timeout: float, quiet: bool, state_file: Optional[Path] = None) -> Optional[Tuple[str, int]]:
+def try_daemon_request(
+    spec: ProviderClientSpec,
+    work_dir: Path,
+    message: str,
+    timeout: float,
+    quiet: bool,
+    state_file: Optional[Path] = None,
+    output_path: Path | None = None,
+) -> Optional[Tuple[str, int]]:
     if not env_bool(spec.enabled_env, True):
         return None
 
@@ -187,6 +195,17 @@ def try_daemon_request(spec: ProviderClientSpec, work_dir: Path, message: str, t
             "quiet": bool(quiet),
             "message": message,
         }
+        if output_path:
+            payload["output_path"] = str(output_path)
+        req_id = os.environ.get("CCB_REQ_ID", "").strip()
+        if req_id:
+            payload["req_id"] = req_id
+        no_wrap = os.environ.get("CCB_NO_WRAP", "").strip()
+        if no_wrap in ("1", "true", "yes"):
+            payload["no_wrap"] = True
+        caller = os.environ.get("CCB_CALLER", "").strip()
+        if caller:
+            payload["caller"] = caller
         connect_timeout = min(1.0, max(0.1, float(timeout)))
         with socket.create_connection((host, port), timeout=connect_timeout) as sock:
             sock.settimeout(0.5)

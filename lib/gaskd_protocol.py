@@ -11,7 +11,8 @@ from ccb_protocol import (
     strip_done_text,
 )
 
-ANY_DONE_LINE_RE = re.compile(r"^\s*CCB_DONE:\s*[0-9a-f]{32}\s*$", re.IGNORECASE)
+# Match both old (32-char hex) and new (YYYYMMDD-HHMMSS-mmm-PID) req_id formats
+ANY_DONE_LINE_RE = re.compile(r"^\s*CCB_DONE:\s*(?:[0-9a-f]{32}|\d{8}-\d{6}-\d{3}-\d+)\s*$", re.IGNORECASE)
 
 
 def wrap_gemini_prompt(message: str, req_id: str) -> str:
@@ -71,6 +72,8 @@ class GaskdRequest:
     quiet: bool
     message: str
     output_path: str | None = None
+    req_id: str | None = None
+    caller: str = "claude"
 
 
 @dataclass(frozen=True)

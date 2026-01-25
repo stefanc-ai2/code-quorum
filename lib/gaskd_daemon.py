@@ -27,6 +27,7 @@ from askd_runtime import state_file_path, log_path, write_log, random_token
 import askd_rpc
 from askd_server import AskDaemonServer
 from providers import GASKD_SPEC
+from completion_hook import notify_completion
 
 
 def _now_ms() -> int:
@@ -299,6 +300,17 @@ class _SessionWorker(BaseSessionWorker[_QueuedTask, GaskdResult]):
                 break
 
         final_reply = extract_reply_for_req(latest_reply, task.req_id)
+
+        # Notify Claude via completion hook (async)
+        notify_completion(
+            provider="gemini",
+            output_file=task.request.output_path,
+            reply=final_reply,
+            req_id=task.req_id,
+            done_seen=done_seen,
+            caller=task.request.caller or "claude",
+        )
+
         return GaskdResult(
             exit_code=0 if done_seen else 2,
             reply=final_reply,
@@ -314,7 +326,7 @@ class _WorkerPool:
         self._pool = PerSessionWorkerPool[_SessionWorker]()
 
     def submit(self, request: GaskdRequest) -> _QueuedTask:
-        req_id = make_req_id()
+        req_id = request.req_id or make_req_id()
         task = _QueuedTask(request=request, created_ms=_now_ms(), req_id=req_id, done_event=threading.Event())
 
         session = load_project_session(Path(request.work_dir))
@@ -343,6 +355,8 @@ class GaskdServer:
                     quiet=bool(msg.get("quiet") or False),
                     message=str(msg.get("message") or ""),
                     output_path=str(msg.get("output_path")) if msg.get("output_path") else None,
+                    req_id=str(msg.get("req_id")) if msg.get("req_id") else None,
+                    caller=str(msg.get("caller") or "claude"),
                 )
             except Exception as exc:
                 return {"type": "gask.response", "v": 1, "id": msg.get("id"), "exit_code": 1, "reply": f"Bad request: {exc}"}

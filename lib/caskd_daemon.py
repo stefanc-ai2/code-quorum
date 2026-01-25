@@ -29,6 +29,7 @@ from askd_runtime import state_file_path, log_path, write_log, random_token
 import askd_rpc
 from askd_server import AskDaemonServer
 from providers import CASKD_SPEC
+from completion_hook import notify_completion
 
 
 def _now_ms() -> int:
@@ -491,11 +492,22 @@ class _SessionWorker(BaseSessionWorker[_QueuedTask, CaskdResult]):
             anchor_ms=anchor_ms,
             done_ms=done_ms,
         )
-        write_log(log_path(CASKD_SPEC.log_file_name), 
+        write_log(log_path(CASKD_SPEC.log_file_name),
             f"[INFO] done session={self.session_key} req_id={task.req_id} exit={result.exit_code} "
             f"anchor={result.anchor_seen} done={result.done_seen} fallback={result.fallback_scan} "
             f"log={result.log_path or ''} anchor_ms={result.anchor_ms or ''} done_ms={result.done_ms or ''}"
         )
+
+        # Notify Claude via completion hook (async)
+        notify_completion(
+            provider="codex",
+            output_file=task.request.output_path,
+            reply=reply,
+            req_id=task.req_id,
+            done_seen=done_seen,
+            caller=task.request.caller or "claude",
+        )
+
         return result
 
 
@@ -753,7 +765,7 @@ class _WorkerPool:
         self._pool = PerSessionWorkerPool[_SessionWorker]()
 
     def submit(self, request: CaskdRequest) -> _QueuedTask:
-        req_id = make_req_id()
+        req_id = request.req_id or make_req_id()
         task = _QueuedTask(request=request, created_ms=_now_ms(), req_id=req_id, done_event=threading.Event())
 
         session = load_project_session(Path(request.work_dir))
@@ -782,6 +794,8 @@ class CaskdServer:
                     quiet=bool(msg.get("quiet") or False),
                     message=str(msg.get("message") or ""),
                     output_path=str(msg.get("output_path")) if msg.get("output_path") else None,
+                    req_id=str(msg.get("req_id")) if msg.get("req_id") else None,
+                    caller=str(msg.get("caller") or "claude"),
                 )
             except Exception as exc:
                 return {"type": "cask.response", "v": 1, "id": msg.get("id"), "exit_code": 1, "reply": f"Bad request: {exc}"}

@@ -31,6 +31,8 @@ class OaskdRequest:
     quiet: bool
     message: str
     output_path: str | None = None
+    req_id: str | None = None
+    caller: str = "claude"
 
 
 @dataclass(frozen=True)
