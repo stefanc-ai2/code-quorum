@@ -73,7 +73,7 @@ function Get-Msg {
     "confirm_windows" = @{ en = "Continue installation in Windows? (y/N)"; zh = "确认继续在 Windows 中安装？(y/N)" }
     "cancelled" = @{ en = "Installation cancelled"; zh = "安装已取消" }
     "windows_warning" = @{ en = "You are installing ccb in native Windows environment"; zh = "你正在 Windows 原生环境安装 ccb" }
-    "same_env" = @{ en = "ccb/cask/cping/cpend must run in the same environment as codex/gemini."; zh = "ccb/cask/cping/cpend 必须与 codex/gemini 在同一环境运行。" }
+    "same_env" = @{ en = "ccb/ask/ping/pend must run in the same environment as codex/gemini."; zh = "ccb/ask/ping/pend 必须与 codex/gemini 在同一环境运行。" }
   }
   if ($msgs.ContainsKey($Key)) {
     return $msgs[$Key][$script:CCBLang]
@@ -171,7 +171,7 @@ function Confirm-BackendEnv {
   Write-Host "================================================================"
   Write-Host "[WARNING] You are installing ccb in native Windows environment"
   Write-Host "================================================================"
-  Write-Host "ccb/cask/cping/cpend must run in the same environment as codex/gemini."
+  Write-Host "ccb/ask/ping/pend must run in the same environment as codex/gemini."
   Write-Host ""
   Write-Host "Please confirm: You will install and run codex/gemini in native Windows (not WSL)."
   Write-Host "If you plan to run codex/gemini in WSL, exit and run in WSL:"

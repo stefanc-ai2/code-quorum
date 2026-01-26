@@ -59,8 +59,8 @@ msg() {
       en_msg="Detected WSL environment"
       zh_msg="检测到 WSL 环境" ;;
     same_env_required)
-      en_msg="ccb/cask/cping/cpend must run in the same environment as codex/gemini."
-      zh_msg="ccb/cask/cping/cpend 必须与 codex/gemini 在同一环境运行。" ;;
+      en_msg="ccb/ask/ping/pend must run in the same environment as codex/gemini."
+      zh_msg="ccb/ask/ping/pend 必须与 codex/gemini 在同一环境运行。" ;;
     confirm_wsl_native)
       en_msg="Please confirm: you will install and run codex/gemini in WSL (not Windows native)."
       zh_msg="请确认：你将在 WSL 中安装并运行 codex/gemini（不是 Windows 原生）。" ;;
@@ -283,7 +283,7 @@ confirm_backend_env_wsl() {
   echo "================================================================"
   echo "WARN: Detected WSL environment"
   echo "================================================================"
-  echo "ccb/cask/cping/cpend must run in the same environment as codex/gemini."
+  echo "ccb/ask/ping/pend must run in the same environment as codex/gemini."
   echo
   echo "Please confirm: you will install and run codex/gemini in WSL (not Windows native)."
   echo "If you plan to run codex/gemini in Windows native, exit and run on Windows side:"

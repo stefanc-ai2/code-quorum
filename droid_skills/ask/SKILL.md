@@ -41,4 +41,4 @@ EOF
 
 ## Notes
 
-- If it fails, check backend health with the corresponding ping command (gping/cping/oping/dping).
+- If it fails, check backend health with the corresponding ping command (`ping <provider>` (e.g., `ping gemini`)).
