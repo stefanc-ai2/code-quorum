@@ -71,7 +71,7 @@ jobs:
           python bin/ask --help
           python bin/ping --help
           python bin/pend --help
-          Write-Host "✅ Unified commands syntax test passed"
+          Write-Host "Unified commands syntax test passed"
 
       - name: Test completion hook imports
         run: |
@@ -79,7 +79,7 @@ jobs:
           import sys
           sys.path.insert(0, 'lib')
           from completion_hook import notify_completion, env_bool
-          print('✅ Completion hook imports test passed')
+          print('Completion hook imports test passed')
           "
 
       - name: Test Windows install script syntax
@@ -96,4 +96,4 @@ jobs:
             $errors | ForEach-Object { Write-Error $_.Message }
             exit 1
           }
-          Write-Host "✅ install.ps1 syntax check passed"
+          Write-Host "install.ps1 syntax check passed"
