@@ -34,6 +34,7 @@ from askd_client import (
 from providers import LASK_CLIENT_SPEC
 from claude_session_resolver import resolve_claude_session
 from terminal import get_backend_for_session, get_pane_id_from_session
+from laskd_protocol import wrap_claude_prompt, make_req_id
 
 
 ASYNC_GUARDRAIL = """[CCB_ASYNC_SUBMITTED provider=claude]
@@ -157,6 +158,10 @@ def main(argv: list[str]) -> int:
             backend = get_backend_for_session(data) if data else None
             pane_id = get_pane_id_from_session(data) if data else ""
             if backend and pane_id:
+                # Apply context injection in fallback path (same as daemon path)
+                if not no_wrap:
+                    req_id = os.environ.get("CCB_REQ_ID") or make_req_id()
+                    message = wrap_claude_prompt(message, req_id)
                 backend.send_text(pane_id, message)
                 if not sync_mode:
                     print(ASYNC_GUARDRAIL, file=sys.stderr, flush=True)
