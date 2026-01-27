@@ -1217,9 +1217,59 @@ install_requirements() {
   fi
 }
 
+# Clean up legacy daemon files (replaced by unified askd)
+cleanup_legacy_files() {
+  echo "Cleaning up legacy files..."
+  local cleaned=0
+
+  # Legacy daemon scripts in bin/
+  local legacy_daemons="caskd gaskd oaskd laskd daskd"
+  for daemon in $legacy_daemons; do
+    if [[ -f "$BIN_DIR/$daemon" ]]; then
+      rm -f "$BIN_DIR/$daemon"
+      echo "  Removed legacy daemon script: $BIN_DIR/$daemon"
+      cleaned=$((cleaned + 1))
+    fi
+    # Also check install prefix bin
+    if [[ -f "$INSTALL_PREFIX/bin/$daemon" ]]; then
+      rm -f "$INSTALL_PREFIX/bin/$daemon"
+      echo "  Removed legacy daemon script: $INSTALL_PREFIX/bin/$daemon"
+      cleaned=$((cleaned + 1))
+    fi
+  done
+
+  # Legacy daemon state files in ~/.cache/ccb/
+  local cache_dir="${XDG_CACHE_HOME:-$HOME/.cache}/ccb"
+  local legacy_states="caskd.json gaskd.json oaskd.json laskd.json daskd.json"
+  for state in $legacy_states; do
+    if [[ -f "$cache_dir/$state" ]]; then
+      rm -f "$cache_dir/$state"
+      echo "  Removed legacy state file: $cache_dir/$state"
+      cleaned=$((cleaned + 1))
+    fi
+  done
+
+  # Legacy daemon module files in lib/
+  local legacy_modules="caskd_daemon.py gaskd_daemon.py oaskd_daemon.py laskd_daemon.py daskd_daemon.py"
+  for module in $legacy_modules; do
+    if [[ -f "$INSTALL_PREFIX/lib/$module" ]]; then
+      rm -f "$INSTALL_PREFIX/lib/$module"
+      echo "  Removed legacy module: $INSTALL_PREFIX/lib/$module"
+      cleaned=$((cleaned + 1))
+    fi
+  done
+
+  if [[ $cleaned -eq 0 ]]; then
+    echo "  No legacy files found"
+  else
+    echo "  Cleaned up $cleaned legacy file(s)"
+  fi
+}
+
 install_all() {
   install_requirements
   remove_codex_mcp
+  cleanup_legacy_files
   save_wezterm_config
   copy_project
   install_bin_links

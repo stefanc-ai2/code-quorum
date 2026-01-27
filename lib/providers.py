@@ -82,8 +82,8 @@ CASK_CLIENT_SPEC = ProviderClientSpec(
     autostart_env_legacy="CCB_AUTO_CASKD",
     state_file_env="CCB_CASKD_STATE_FILE",
     session_filename=".codex-session",
-    daemon_bin_name="caskd",
-    daemon_module="caskd_daemon",
+    daemon_bin_name="askd",
+    daemon_module="askd.daemon",
 )
 
 
@@ -94,8 +94,8 @@ GASK_CLIENT_SPEC = ProviderClientSpec(
     autostart_env_legacy="CCB_AUTO_GASKD",
     state_file_env="CCB_GASKD_STATE_FILE",
     session_filename=".gemini-session",
-    daemon_bin_name="gaskd",
-    daemon_module="gaskd_daemon",
+    daemon_bin_name="askd",
+    daemon_module="askd.daemon",
 )
 
 
@@ -106,8 +106,8 @@ OASK_CLIENT_SPEC = ProviderClientSpec(
     autostart_env_legacy="CCB_AUTO_OASKD",
     state_file_env="CCB_OASKD_STATE_FILE",
     session_filename=".opencode-session",
-    daemon_bin_name="oaskd",
-    daemon_module="oaskd_daemon",
+    daemon_bin_name="askd",
+    daemon_module="askd.daemon",
 )
 
 
@@ -118,8 +118,8 @@ LASK_CLIENT_SPEC = ProviderClientSpec(
     autostart_env_legacy="CCB_AUTO_LASKD",
     state_file_env="CCB_LASKD_STATE_FILE",
     session_filename=".claude-session",
-    daemon_bin_name="laskd",
-    daemon_module="laskd_daemon",
+    daemon_bin_name="askd",
+    daemon_module="askd.daemon",
 )
 
 
@@ -130,6 +130,6 @@ DASK_CLIENT_SPEC = ProviderClientSpec(
     autostart_env_legacy="CCB_AUTO_DASKD",
     state_file_env="CCB_DASKD_STATE_FILE",
     session_filename=".droid-session",
-    daemon_bin_name="daskd",
-    daemon_module="daskd_daemon",
+    daemon_bin_name="askd",
+    daemon_module="askd.daemon",
 )

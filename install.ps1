@@ -332,6 +332,7 @@ function Install-Native {
   Install-CodexSkills
   Install-ClaudeConfig
   Install-DroidDelegation -PythonCmd $pythonCmd -InstallPrefix $InstallPrefix
+  Cleanup-LegacyFiles -InstallPrefix $InstallPrefix
 
   try {
     Set-WezTermDefaultShellToPowerShell
@@ -349,6 +350,59 @@ function Install-Native {
   Write-Host "  ccb gemini      # Start with Gemini backend"
   Write-Host "  ccb opencode    # Start with OpenCode backend"
   Write-Host "  ccb claude      # Start with Claude backend"
+}
+
+# Clean up legacy daemon files (replaced by unified askd)
+function Cleanup-LegacyFiles {
+  param([string]$InstallPrefix)
+
+  Write-Host "Cleaning up legacy files..."
+  $cleaned = 0
+
+  # Legacy daemon scripts in bin/
+  $legacyDaemons = @("caskd", "gaskd", "oaskd", "laskd", "daskd")
+  $binDir = Join-Path $InstallPrefix "bin"
+
+  foreach ($daemon in $legacyDaemons) {
+    $daemonPath = Join-Path $binDir $daemon
+    if (Test-Path $daemonPath) {
+      Remove-Item -Force $daemonPath
+      Write-Host "  Removed legacy daemon script: $daemonPath"
+      $cleaned++
+    }
+  }
+
+  # Legacy daemon state files in cache
+  $cacheDir = Join-Path $env:LOCALAPPDATA "ccb"
+  $legacyStates = @("caskd.json", "gaskd.json", "oaskd.json", "laskd.json", "daskd.json")
+
+  foreach ($state in $legacyStates) {
+    $statePath = Join-Path $cacheDir $state
+    if (Test-Path $statePath) {
+      Remove-Item -Force $statePath
+      Write-Host "  Removed legacy state file: $statePath"
+      $cleaned++
+    }
+  }
+
+  # Legacy daemon module files in lib/
+  $libDir = Join-Path $InstallPrefix "lib"
+  $legacyModules = @("caskd_daemon.py", "gaskd_daemon.py", "oaskd_daemon.py", "laskd_daemon.py", "daskd_daemon.py")
+
+  foreach ($module in $legacyModules) {
+    $modulePath = Join-Path $libDir $module
+    if (Test-Path $modulePath) {
+      Remove-Item -Force $modulePath
+      Write-Host "  Removed legacy module: $modulePath"
+      $cleaned++
+    }
+  }
+
+  if ($cleaned -eq 0) {
+    Write-Host "  No legacy files found"
+  } else {
+    Write-Host "  Cleaned up $cleaned legacy file(s)"
+  }
 }
 
 function Install-CodexSkills {
