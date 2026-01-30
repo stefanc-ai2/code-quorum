@@ -41,3 +41,10 @@
 
 - Don’t commit local session/config artifacts under `.ccb_config/` or provider runtime/session files.
 - Prefer configuration via `ccb.config` (`.ccb_config/ccb.config` or `~/.ccb/ccb.config`) and environment variables; avoid hardcoding paths or secrets.
+
+## Beads (Issue Tracking)
+
+- This repo uses Beads (`bd`) for issue tracking; project state lives under `.beads/`.
+- Git tracking: `.beads/issues.jsonl` is committed. SQLite DBs and daemon runtime files under `.beads/` are ignored via `.beads/.gitignore`.
+- Merge behavior: `.gitattributes` configures a custom merge driver for `.beads/issues.jsonl` (requires Beads tooling available for best results).
+- Prefer using `bd` commands instead of editing `.beads/*.jsonl` by hand.
