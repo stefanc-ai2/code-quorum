@@ -506,6 +506,7 @@ class _SessionWorker(BaseSessionWorker[_QueuedTask, CaskdResult]):
             req_id=task.req_id,
             done_seen=done_seen,
             caller=task.request.caller or "claude",
+            work_dir=task.request.work_dir,
         )
 
         return result

@@ -197,6 +197,7 @@ class DroidAdapter(BaseProviderAdapter):
             req_id=task.req_id,
             done_seen=done_seen,
             caller=req.caller,
+            work_dir=req.work_dir,
         )
 
         result = ProviderResult(

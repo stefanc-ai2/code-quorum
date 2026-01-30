@@ -22,7 +22,15 @@ def env_bool(name: str, default: bool = True) -> bool:
     return val not in ("0", "false", "no", "off")
 
 
-def _run_hook_async(provider: str, output_file: Optional[str], reply: str, req_id: str, caller: str) -> None:
+def _run_hook_async(
+    provider: str,
+    output_file: Optional[str],
+    reply: str,
+    req_id: str,
+    caller: str,
+    *,
+    work_dir: str | None = None,
+) -> None:
     """Run the completion hook in a background thread."""
     if not env_bool("CCB_COMPLETION_HOOK_ENABLED", True):
         return
@@ -62,8 +70,25 @@ def _run_hook_async(provider: str, output_file: Optional[str], reply: str, req_i
             if output_file:
                 cmd.extend(["--output", output_file])
 
+            env = os.environ.copy()
+            cwd = None
+            if work_dir:
+                env["CCB_WORK_DIR"] = work_dir
+                try:
+                    if Path(work_dir).is_dir():
+                        cwd = work_dir
+                except Exception:
+                    cwd = None
+
             # Pass reply via stdin to avoid command line length limits
-            subprocess.run(cmd, input=(reply or "").encode("utf-8"), capture_output=True, timeout=10)
+            subprocess.run(
+                cmd,
+                input=(reply or "").encode("utf-8"),
+                capture_output=True,
+                timeout=10,
+                env=env,
+                cwd=cwd,
+            )
         except Exception:
             pass
 
@@ -79,6 +104,7 @@ def notify_completion(
     req_id: str,
     done_seen: bool,
     caller: str = "claude",
+    work_dir: str | None = None,
 ) -> None:
     """
     Notify the caller that a CCB delegation task has completed.
@@ -94,4 +120,4 @@ def notify_completion(
     if not done_seen:
         return
 
-    _run_hook_async(provider, output_file, reply, req_id, caller)
+    _run_hook_async(provider, output_file, reply, req_id, caller, work_dir=work_dir)
