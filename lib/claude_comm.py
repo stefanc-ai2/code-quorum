@@ -288,18 +288,42 @@ class ClaudeLogReader:
 
     def _scan_latest_session(self) -> Optional[Path]:
         project_dir = self._project_dir()
-        if not project_dir.exists():
-            return None
-        try:
-            sessions = sorted(
-                (p for p in project_dir.glob("*.jsonl") if p.is_file() and not p.name.startswith(".")),
-                key=lambda p: p.stat().st_mtime,
-                reverse=True,
-            )
-        except OSError:
-            return None
+
+        def _mtime_safe(p: Path) -> float:
+            try:
+                return p.stat().st_mtime
+            except OSError:
+                return -1.0
+
+        def _scan_dir(scan_dir: Path) -> list[Path]:
+            if not scan_dir.exists():
+                return []
+            try:
+                return [p for p in scan_dir.glob("*.jsonl") if p.is_file() and not p.name.startswith(".")]
+            except OSError:
+                return []
+
+        # Primary scan: project directory
+        sessions = _scan_dir(project_dir)
+
+        # Fallback: if project_dir has no sessions, also scan preferred session's directory
+        # (handles cross-project scenarios where registry points to a different project key)
+        if not sessions and self._preferred_session:
+            preferred_dir = self._preferred_session.parent
+            if preferred_dir != project_dir:
+                sessions = _scan_dir(preferred_dir)
+
         if not sessions:
             return None
+
+        # Sort by mtime descending, filtering out stat failures
+        sessions = sorted(sessions, key=_mtime_safe, reverse=True)
+        sessions = [s for s in sessions if _mtime_safe(s) >= 0]
+
+        if not sessions:
+            return None
+
+        # Prefer confirmed non-sidechain (False), then unknown (None), skip confirmed sidechain (True)
         first_unknown: Optional[Path] = None
         first_any = sessions[0]
         for session in sessions:
@@ -308,6 +332,7 @@ class ClaudeLogReader:
                 return session
             if sidechain is None and first_unknown is None:
                 first_unknown = session
+        # Return first unknown if no confirmed non-sidechain found
         return first_unknown or first_any
 
     def _latest_session(self) -> Optional[Path]:
@@ -336,8 +361,22 @@ class ClaudeLogReader:
                     best_mtime = mtime
             return best
 
+        def _same_dir(a: Optional[Path], b: Optional[Path]) -> bool:
+            if not a or not b:
+                return False
+            try:
+                return a.parent.resolve() == b.parent.resolve()
+            except Exception:
+                return a.parent == b.parent
+
         if preferred and preferred.exists():
-            newest = _pick_newest(preferred, index_session, scanned)
+            # Only compare preferred with scanned if they're in the same directory.
+            # This prevents cross-project bleed when scanned found sessions in project_dir.
+            if scanned and not _same_dir(preferred, scanned):
+                # scanned is from project_dir which has sessions; use it, don't cross directories
+                newest = _pick_newest(index_session, scanned)
+            else:
+                newest = _pick_newest(preferred, index_session, scanned)
             if newest:
                 self._preferred_session = newest
                 return newest
