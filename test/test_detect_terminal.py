@@ -65,16 +65,3 @@ def test_detect_terminal_rejects_stale_tmux_env(monkeypatch) -> None:
 
     monkeypatch.setattr(terminal, "_run", fake_run)
     assert terminal.detect_terminal() is None
-
-
-def test_detect_terminal_wsl_probe_does_not_select_wezterm_without_pane(monkeypatch) -> None:
-    _clear_terminal_env(monkeypatch)
-    monkeypatch.setattr(terminal, "is_wsl", lambda: True)
-    monkeypatch.setattr(terminal, "_is_windows_wezterm", lambda: True)
-    monkeypatch.setattr(terminal, "_get_wezterm_bin", lambda: "/mnt/c/Program Files/WezTerm/wezterm.exe")
-
-    def fake_run(*args, **kwargs):
-        return terminal.subprocess.CompletedProcess(args=args[0], returncode=0, stdout="[]", stderr="")
-
-    monkeypatch.setattr(terminal, "_run", fake_run)
-    assert terminal.detect_terminal() is None

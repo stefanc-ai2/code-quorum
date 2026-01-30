@@ -3,13 +3,7 @@ from __future__ import annotations
 import hashlib
 import os
 import posixpath
-import re
 from pathlib import Path
-
-
-_WIN_DRIVE_RE = re.compile(r"^[A-Za-z]:([/\\\\]|$)")
-_MNT_DRIVE_RE = re.compile(r"^/mnt/([A-Za-z])/(.*)$")
-_MSYS_DRIVE_RE = re.compile(r"^/([A-Za-z])/(.*)$")
 
 
 def normalize_work_dir(value: str | Path) -> str:
@@ -17,9 +11,8 @@ def normalize_work_dir(value: str | Path) -> str:
     Normalize a work_dir into a stable string for hashing and matching.
 
     Goals:
-    - Be stable within a single environment (Linux/WSL/Windows/MSYS).
-    - Reduce trivial path-format mismatches (slashes, drive letter casing, /mnt/<drive> mapping).
-    - Avoid resolve() by default to reduce symlink/interop surprises.
+    - Be stable within a single environment (macOS/Linux).
+    - Reduce trivial path-format mismatches (slashes, dot segments).
     """
     raw = str(value).strip()
     if not raw:
@@ -34,33 +27,13 @@ def normalize_work_dir(value: str | Path) -> str:
 
     # Absolutize when relative (best-effort).
     try:
-        preview = raw.replace("\\", "/")
-        is_abs = (
-            preview.startswith("/")
-            or preview.startswith("//")
-            or preview.startswith("\\\\")
-            or bool(_WIN_DRIVE_RE.match(preview))
-        )
-        if not is_abs:
-            raw = str((Path.cwd() / Path(raw)).absolute())
+        p = Path(raw)
+        if not p.is_absolute():
+            raw = str((Path.cwd() / p).absolute())
     except Exception:
         pass
 
     s = raw.replace("\\", "/")
-
-    # Map WSL mount paths to a Windows-like drive form for stable matching.
-    m = _MNT_DRIVE_RE.match(s)
-    if m:
-        drive = m.group(1).lower()
-        rest = m.group(2)
-        s = f"{drive}:/{rest}"
-    else:
-        # Map MSYS /c/... to c:/...
-        m = _MSYS_DRIVE_RE.match(s)
-        if m and ("MSYSTEM" in os.environ or os.name == "nt"):
-            drive = m.group(1).lower()
-            rest = m.group(2)
-            s = f"{drive}:/{rest}"
 
     # Collapse redundant separators and dot segments using POSIX semantics (we forced "/").
     if s.startswith("//"):
@@ -69,10 +42,6 @@ def normalize_work_dir(value: str | Path) -> str:
         s = prefix + rest.lstrip("/")
     else:
         s = posixpath.normpath(s)
-
-    # Normalize Windows drive letter casing.
-    if _WIN_DRIVE_RE.match(s):
-        s = s[0].lower() + s[1:]
 
     return s
 

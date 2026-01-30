@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import pytest
@@ -9,24 +8,11 @@ from project_id import compute_ccb_project_id, normalize_work_dir
 
 
 def test_normalize_work_dir_basic() -> None:
-    # On Windows, /a/... is interpreted as MSYS path (a:/)
-    # On Unix, it's a regular absolute path
     result1 = normalize_work_dir("/a/b/../c")
-    if os.name == 'nt':
-        assert result1 == "a:/c", f"Expected a:/c on Windows, got {result1}"
-    else:
-        assert result1 == "/a/c", f"Expected /a/c on Unix, got {result1}"
+    assert result1 == "/a/c"
 
     result2 = normalize_work_dir("/a//b///c")
-    if os.name == 'nt':
-        assert result2 == "a:/b/c", f"Expected a:/b/c on Windows, got {result2}"
-    else:
-        assert result2 == "/a/b/c", f"Expected /a/b/c on Unix, got {result2}"
-
-
-def test_normalize_work_dir_wsl_drive_mapping() -> None:
-    assert normalize_work_dir("/mnt/C/Users/alice") == "c:/Users/alice"
-    assert normalize_work_dir("/mnt/c/Users/alice") == "c:/Users/alice"
+    assert result2 == "/a/b/c"
 
 
 def test_compute_ccb_project_id_stable_for_same_dir(tmp_path: Path) -> None:
