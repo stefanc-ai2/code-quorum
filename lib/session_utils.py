@@ -100,7 +100,15 @@ def safe_write_session(session_file: Path, content: str) -> Tuple[bool, Optional
     tmp_file = session_file.with_suffix(".tmp")
     try:
         tmp_file.write_text(content, encoding="utf-8")
+        try:
+            os.chmod(tmp_file, 0o600)
+        except Exception:
+            pass
         os.replace(tmp_file, session_file)
+        try:
+            os.chmod(session_file, 0o600)
+        except Exception:
+            pass
         return True, None
     except PermissionError as e:
         if tmp_file.exists():

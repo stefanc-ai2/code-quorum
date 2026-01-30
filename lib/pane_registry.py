@@ -281,6 +281,11 @@ def upsert_registry(record: Dict[str, Any]) -> bool:
         return False
     path = registry_path_for_session(str(session_id))
     path.parent.mkdir(parents=True, exist_ok=True)
+    # Best-effort: keep registry files private (they contain pane ids/session paths).
+    try:
+        os.chmod(path.parent, 0o700)
+    except Exception:
+        pass
 
     data: Dict[str, Any] = {}
     if path.exists():
@@ -348,6 +353,10 @@ def upsert_registry(record: Dict[str, Any]) -> bool:
 
     try:
         atomic_write_text(path, json.dumps(data, ensure_ascii=False, indent=2))
+        try:
+            os.chmod(path, 0o600)
+        except Exception:
+            pass
         return True
     except Exception as exc:
         _debug(f"Failed to write registry {path}: {exc}")

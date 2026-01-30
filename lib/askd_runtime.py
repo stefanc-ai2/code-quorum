@@ -102,6 +102,21 @@ def write_log(path: Path, msg: str) -> None:
     try:
         _maybe_shrink_log(path)
         path.parent.mkdir(parents=True, exist_ok=True)
+        # Best-effort: keep daemon runtime dirs/logs private on multi-user systems.
+        try:
+            os.chmod(path.parent, 0o700)
+        except Exception:
+            pass
+
+        # Best-effort secure create: ensure logs are not world-readable if umask is permissive.
+        try:
+            if not path.exists():
+                fd = os.open(str(path), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+                os.close(fd)
+            os.chmod(path, 0o600)
+        except Exception:
+            pass
+
         with path.open("a", encoding="utf-8") as handle:
             handle.write(msg.rstrip() + "\n")
     except Exception:
