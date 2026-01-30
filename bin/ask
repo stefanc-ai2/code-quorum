@@ -377,7 +377,17 @@ def main(argv: list[str]) -> int:
     task_id = make_task_id()
     log_dir = Path(tempfile.gettempdir()) / "ccb-tasks"
     log_dir.mkdir(parents=True, exist_ok=True)
+    # Best-effort hardening: avoid leaking prompts/replies in multi-user environments.
+    try:
+        os.chmod(log_dir, 0o700)
+    except Exception:
+        pass
     log_file = log_dir / f"ask-{provider}-{task_id}.log"
+    try:
+        fd = os.open(str(log_file), os.O_CREAT | os.O_TRUNC | os.O_WRONLY, 0o600)
+        os.close(fd)
+    except Exception:
+        pass
 
     # Detect caller from environment or default to "claude"
     caller = _default_caller()
@@ -401,6 +411,10 @@ def main(argv: list[str]) -> int:
         # Write message to temp file to avoid escaping issues
         msg_file = log_dir / f"ask-{provider}-{task_id}.msg"
         msg_file.write_text(message, encoding="utf-8")
+        try:
+            os.chmod(msg_file, 0o600)
+        except Exception:
+            pass
 
         # Write PowerShell script - call ask --foreground to use unified daemon
         script_file = log_dir / f"ask-{provider}-{task_id}.ps1"
@@ -413,16 +427,25 @@ $env:CCB_WORK_DIR = '{work_dir_ps}'
 Get-Content -Path "{msg_file}" -Encoding UTF8 | python "{ask_cmd}" {provider} --foreground --timeout {timeout}
 '''
         script_file.write_text(script_content, encoding="utf-8")
+        try:
+            os.chmod(script_file, 0o700)
+        except Exception:
+            pass
+
+        try:
+            log_handle = open(log_file, "w", encoding="utf-8")
+        except Exception:
+            log_handle = open(log_file, "w")
 
         subprocess.Popen(
             ["powershell", "-ExecutionPolicy", "Bypass", "-NoProfile", "-File", str(script_file)],
             stdin=subprocess.DEVNULL,
-            stdout=open(log_file, "w"),
+            stdout=log_handle,
             stderr=subprocess.STDOUT,
             creationflags=DETACHED_PROCESS | CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP,
         )
     else:
-        # Unix: use nohup, call ask --foreground to use unified daemon
+        # Unix: run detached; call ask --foreground to use unified daemon.
         bg_script = f'''
 export CCB_REQ_ID="{task_id}"
 export CCB_CALLER="{caller}"
@@ -435,15 +458,24 @@ ASKEOF
         # Write script to temp file for nohup execution
         script_file = log_dir / f"ask-{provider}-{task_id}.sh"
         script_file.write_text(bg_script, encoding="utf-8")
-        script_file.chmod(0o755)
+        try:
+            script_file.chmod(0o700)
+        except Exception:
+            pass
 
-        # Use nohup to run in background, independent of terminal
+        try:
+            log_handle = open(log_file, "a", encoding="utf-8")
+        except Exception:
+            log_handle = open(log_file, "a")
+
+        # Detach from terminal without relying on `nohup`/shell redirection (preserves file permissions).
         subprocess.Popen(
-            f'nohup sh "{script_file}" > "{log_file}" 2>&1 &',
-            shell=True,
+            ["sh", str(script_file)],
             stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stdout=log_handle,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+            close_fds=True,
         )
 
     print(f"{provider.capitalize()} processing (task: {task_id}, log: {log_file})...")
