@@ -79,3 +79,66 @@ def test_lpend_prefers_newer_claude_session_path_over_registry(tmp_path, monkeyp
     assert rc == lpend.EXIT_OK
     out = capsys.readouterr().out.strip()
     assert out == "new"
+
+
+def test_lpend_prefers_session_with_newer_subagent_activity(tmp_path, monkeypatch, capsys) -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    lpend = _load_lpend(repo_root)
+
+    work_dir = tmp_path / "repo"
+    (work_dir / ".ccb_config").mkdir(parents=True)
+
+    registry_path = tmp_path / "registry.jsonl"
+    session_path = tmp_path / "session.jsonl"
+    _write_session(registry_path, "registry")
+    _write_session(session_path, "session")
+
+    now = time.time()
+    # Make registry_path "older", but give it a newer subagent log mtime.
+    registry_ts = now - 30
+    session_ts = now - 10
+    import os
+
+    os.utime(registry_path, (registry_ts, registry_ts))
+    os.utime(session_path, (session_ts, session_ts))
+
+    subagents_dir = registry_path.parent / registry_path.stem / "subagents"
+    subagents_dir.mkdir(parents=True)
+    subagent_log = subagents_dir / "worker.jsonl"
+    subagent_log.write_text('{"type":"assistant","content":"subagent"}\n', encoding="utf-8")
+    os.utime(subagent_log, (now, now))
+
+    monkeypatch.setattr(lpend, "resolve_work_dir_with_registry", lambda *_args, **_kwargs: (work_dir, None))
+    monkeypatch.setattr(lpend, "_load_registry_log_path", lambda *_args, **_kwargs: (registry_path, {"stub": True}))
+    monkeypatch.setattr(lpend, "_load_session_log_path", lambda *_args, **_kwargs: (session_path, "sid"))
+    monkeypatch.setattr(lpend, "compute_ccb_project_id", lambda *_args, **_kwargs: "pid")
+
+    class _FakeReader:
+        def __init__(self, *args, **kwargs) -> None:
+            self._preferred: Path | None = None
+
+        def set_preferred_session(self, path: Path) -> None:
+            self._preferred = path
+
+        def latest_message(self) -> str | None:
+            if not self._preferred:
+                return None
+            for line in self._preferred.read_text(encoding="utf-8").splitlines():
+                try:
+                    entry = json.loads(line)
+                except Exception:
+                    continue
+                msg = entry.get("content")
+                if isinstance(msg, str) and msg.strip():
+                    return msg.strip()
+            return None
+
+        def latest_conversations(self, n: int):
+            return []
+
+    monkeypatch.setattr(lpend, "ClaudeLogReader", _FakeReader)
+
+    rc = lpend.main(["lpend"])
+    assert rc == lpend.EXIT_OK
+    out = capsys.readouterr().out.strip()
+    assert out == "registry"

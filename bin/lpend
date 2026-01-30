@@ -118,6 +118,30 @@ def _mtime_safe(path: Path | None) -> float:
         return -1.0
 
 
+def _claude_session_activity_mtime(session_log_path: Path | None) -> float:
+    """
+    Return a best-effort "activity" timestamp for a Claude session.
+
+    Claude can write assistant replies into per-session subagent logs without
+    updating the main `<session_id>.jsonl` file. To avoid choosing stale sessions
+    based solely on the main file's mtime, consider subagent log mtimes too.
+    """
+    if not session_log_path:
+        return -1.0
+
+    best = _mtime_safe(session_log_path)
+    try:
+        session_dir = session_log_path.parent / session_log_path.stem
+        subagents_dir = session_dir / "subagents"
+        if subagents_dir.is_dir():
+            for p in subagents_dir.glob("*.jsonl"):
+                best = max(best, _mtime_safe(p))
+    except Exception:
+        # Best-effort only; fall back to main file mtime.
+        return best
+    return best
+
+
 def _pick_newest_session_path(registry_path: Path | None, session_path: Path | None) -> Path | None:
     """
     Pick the best session log path between registry and .claude-session.
@@ -127,7 +151,7 @@ def _pick_newest_session_path(registry_path: Path | None, session_path: Path | N
     candidates = [p for p in (registry_path, session_path) if p and p.exists()]
     if not candidates:
         return registry_path or session_path
-    best = max(candidates, key=_mtime_safe)
+    best = max(candidates, key=_claude_session_activity_mtime)
     return best
 
 
