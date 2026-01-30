@@ -638,6 +638,7 @@ class WeztermBackend(TerminalBackend):
     def __init__(self) -> None:
         self._last_list_error: Optional[str] = None
 
+    @property
     def last_list_error(self) -> Optional[str]:
         return self._last_list_error
 

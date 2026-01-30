@@ -1,50 +1,130 @@
-#!/usr/bin/env bash
-# ccb-mounted - Check which CCB providers are mounted
-# Usage: ccb-mounted [--json|--simple]
+#!/usr/bin/env python3
+"""
+ccb-mounted - Check which CCB providers are mounted.
 
-set -euo pipefail
+A provider is "mounted" if:
+1. Session file exists (.ccb_config/.{provider}-session or .{provider}-session)
+2. Daemon is responsive (via RPC ping) - OR socket access is blocked (sandbox mode)
 
-PROVIDERS="codex:cask gemini:gask opencode:oask claude:lask droid:dask"
-CWD="${1:-$(pwd)}"
-FORMAT="${2:---json}"
+Supports both unified askd daemon and legacy per-provider daemons.
+Falls back to session-file-only checks in sandboxed environments.
 
-# Get script directory
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+Usage:
+    ccb-mounted [CWD] [--json|--simple]
+"""
 
-# Normalize CWD for Windows (convert /e/... to E:/...)
-if [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "cygwin" ]]; then
-  # Convert msys path /e/foo to E:/foo
-  if [[ "$CWD" =~ ^/([a-zA-Z])/ ]]; then
-    CWD="${BASH_REMATCH[1]^}:${CWD:2}"
-  fi
-fi
+import sys
+import os
+import json
+import socket
+from pathlib import Path
 
-# Check mounted providers using ping command
-# This works with both legacy per-provider daemons and the unified askd daemon
-MOUNTED=""
-for pair in $PROVIDERS; do
-  provider="${pair%%:*}"
-  # Check session file exists first
-  if [[ -f "$CWD/.ccb_config/.${provider}-session" ]] || [[ -f "$CWD/.${provider}-session" ]]; then
-    # Try the ping command to check if daemon is responsive
-    if "$SCRIPT_DIR/ping" "$provider" >/dev/null 2>&1; then
-      MOUNTED="$MOUNTED $provider"
-    fi
-  fi
-done
+script_dir = Path(__file__).resolve().parent
+lib_dir = script_dir.parent / "lib"
+sys.path.insert(0, str(lib_dir))
 
-MOUNTED=$(echo $MOUNTED | xargs)  # trim
+PROVIDERS = ["codex", "gemini", "opencode", "claude", "droid"]
 
-case "$FORMAT" in
-  --simple)
-    echo "$MOUNTED"
-    ;;
-  --json|*)
-    if [[ -z "$MOUNTED" ]]; then
-      echo "{\"cwd\":\"$CWD\",\"mounted\":[]}"
-    else
-      JSON_ARRAY=$(echo "$MOUNTED" | sed 's/ /","/g;s/^/"/;s/$/"/')
-      echo "{\"cwd\":\"$CWD\",\"mounted\":[$JSON_ARRAY]}"
-    fi
-    ;;
-esac
+
+def find_session_file(cwd: Path, provider: str) -> bool:
+    """Check if session file exists for provider."""
+    candidates = [
+        cwd / ".ccb_config" / f".{provider}-session",
+        cwd / f".{provider}-session",
+    ]
+    return any(p.exists() for p in candidates)
+
+
+def can_connect_localhost() -> bool:
+    """Test if we can make localhost socket connections (sandbox check)."""
+    try:
+        # Try to create a socket and connect to a likely-closed port
+        # If we get "Operation not permitted", we're in a sandbox
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(0.1)
+        try:
+            # Port 1 is almost certainly not listening, so we expect connection refused
+            # But if we're sandboxed, we'll get permission denied
+            sock.connect(("127.0.0.1", 1))
+        except PermissionError:
+            # Sandbox detected
+            return False
+        except (socket.timeout, ConnectionRefusedError, OSError):
+            # Normal behavior - we can attempt connections
+            return True
+        finally:
+            sock.close()
+    except Exception:
+        return True  # Assume we can connect if test fails unexpectedly
+    return True
+
+
+def ping_unified_askd() -> bool:
+    """Ping the unified askd daemon."""
+    try:
+        from askd import daemon as askd_daemon
+        return askd_daemon.ping_daemon(timeout_s=0.5)
+    except Exception:
+        return False
+
+
+def ping_provider_daemon(provider: str) -> bool:
+    """Ping a provider-specific daemon (legacy mode)."""
+    daemon_modules = {
+        "codex": "caskd_daemon",
+        "gemini": "gaskd_daemon",
+        "opencode": "oaskd_daemon",
+        "claude": "laskd_daemon",
+        "droid": "daskd_daemon",
+    }
+    module_name = daemon_modules.get(provider)
+    if not module_name:
+        return False
+    try:
+        module = __import__(module_name)
+        ping = getattr(module, "ping_daemon", None)
+        if ping:
+            return ping(timeout_s=0.5)
+        return False
+    except Exception:
+        return False
+
+
+def main():
+    args = sys.argv[1:]
+
+    # Parse arguments
+    cwd = Path.cwd()
+    fmt = "--json"
+
+    for arg in args:
+        if arg.startswith("--"):
+            fmt = arg
+        else:
+            cwd = Path(arg)
+
+    # Check if we're in a sandboxed environment
+    sandboxed = not can_connect_localhost()
+
+    # Check if unified askd is running (skip if sandboxed)
+    unified_askd_running = False if sandboxed else ping_unified_askd()
+
+    mounted = []
+
+    for provider in PROVIDERS:
+        if find_session_file(cwd, provider):
+            if sandboxed:
+                # In sandbox, trust session files exist = mounted
+                mounted.append(provider)
+            elif unified_askd_running or ping_provider_daemon(provider):
+                mounted.append(provider)
+
+    if fmt == "--simple":
+        print(" ".join(mounted))
+    else:
+        result = {"cwd": str(cwd), "mounted": mounted}
+        print(json.dumps(result))
+
+
+if __name__ == "__main__":
+    main()

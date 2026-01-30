@@ -1,12 +1,14 @@
 ---
 name: all-plan
-description: Collaborative planning with all mounted CLIs (Claude, Codex, Gemini, OpenCode) for comprehensive solution design.
+description: Collaborative planning with mounted CLIs only. Automatically detects active providers via ccb-mounted.
 metadata:
-  short-description: Collaborative planning with all CLIs
+  short-description: Collaborative planning with mounted CLIs
 ---
 
 # All Plan
 
-Collaborative planning involving all mounted CLIs with iterative refinement.
+Collaborative planning involving only the mounted/active CLIs with iterative refinement.
+
+**IMPORTANT**: This skill automatically detects which providers are active by running `ccb-mounted`. It will only dispatch to providers that are actually mounted. For example, if you ran `ccb claude codex`, only Claude and Codex will participate in the planning.
 
 For full instructions, see `references/flow.md`

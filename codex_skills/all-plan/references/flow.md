@@ -1,6 +1,6 @@
 # All Plan (Codex Version)
 
-Collaborative planning with all mounted CLIs (Codex, Claude, Gemini, OpenCode) for comprehensive solution design. Codex serves as the primary coordinator.
+Collaborative planning with mounted CLIs for comprehensive solution design. Codex serves as the primary coordinator.
 
 **Usage**: For complex features or architectural decisions requiring diverse perspectives.
 
@@ -11,6 +11,32 @@ Collaborative planning with all mounted CLIs (Codex, Claude, Gemini, OpenCode) f
 From `$ARGUMENTS`:
 - `requirement`: User's initial requirement or feature request
 - `context`: Optional project context or constraints
+
+---
+
+## Pre-Execution: Detect Mounted Providers
+
+**CRITICAL**: Before starting the flow, determine which providers are actually available.
+
+Run:
+```bash
+ccb-mounted
+```
+
+This returns JSON like:
+```json
+{"cwd":"/path/to/project","mounted":["codex","claude"]}
+```
+
+Parse the `mounted` array and **ONLY dispatch to providers in this list**.
+
+- If only `["codex","claude"]` → dispatch only to Claude (Codex designs independently)
+- If `["codex","gemini","claude"]` → dispatch to Claude and Gemini
+- If `["codex","gemini","opencode","claude"]` → dispatch to all three external providers
+
+**Skip any provider not in the mounted list.** Do not attempt to dispatch to unmounted providers.
+
+Save the mounted providers list as `mounted_providers`.
 
 ---
 
@@ -212,9 +238,11 @@ Save as `design_brief`.
 
 ### Phase 2: Parallel Independent Design
 
-Send the design brief to all other mounted CLIs for independent design.
+Send the design brief to mounted CLIs (from `mounted_providers`) for independent design.
 
-**2.1 Dispatch to Claude**
+**IMPORTANT**: Only dispatch to providers that appear in `mounted_providers`. Skip any provider not in the list.
+
+**2.1 Dispatch to Claude** (if "claude" in mounted_providers)
 
 ```bash
 lask --sync -q <<'EOF'
@@ -236,7 +264,7 @@ EOF
 
 Save response as `claude_design`.
 
-**2.2 Dispatch to Gemini**
+**2.2 Dispatch to Gemini** (if "gemini" in mounted_providers)
 
 ```bash
 gask <<'EOF'
@@ -258,7 +286,7 @@ EOF
 
 Wait for response. Save as `gemini_design`.
 
-**2.3 Dispatch to OpenCode**
+**2.3 Dispatch to OpenCode** (if "opencode" in mounted_providers)
 
 ```bash
 oask <<'EOF'
@@ -298,15 +326,15 @@ Save as `codex_design`.
 
 **3.1 Collect All Responses**
 
-Gather all four designs:
-- Claude design → `claude_design`
-- Gemini design → `gemini_design`
-- OpenCode design → `opencode_design`
+Gather designs from mounted providers only:
+- If "claude" was dispatched → save as `claude_design`
+- If "gemini" was dispatched → save as `gemini_design`
+- If "opencode" was dispatched → save as `opencode_design`
 - Codex design → `codex_design`
 
 **3.2 Comparative Analysis**
 
-Analyze all four designs (Codex, Claude, Gemini, OpenCode):
+Analyze designs from Codex + all mounted providers that responded:
 
 Create a comparison matrix:
 ```
@@ -552,9 +580,8 @@ Use this template:
 | CLI | Key Contributions |
 |-----|-------------------|
 | Codex | [contributions] |
-| Claude | [contributions] |
-| Gemini | [contributions] |
-| OpenCode | [contributions] |
+[For each provider in mounted_providers, add a row:]
+| [Provider] | [contributions] |
 
 ---
 
@@ -610,5 +637,6 @@ Next: Review the plan and proceed with implementation when ready.
 - For simple tasks, use dual-design or direct implementation instead
 - Codex uses `lask --sync` for synchronous communication with Claude
 - `gask` and `oask` may require waiting for async responses
-- If any CLI is not available, proceed with available CLIs and note the absence
+- **CRITICAL**: Always run `ccb-mounted` first to detect which providers are active. Only dispatch to providers in the `mounted` array
+- If only Codex and Claude are mounted, the collaboration will be between those two only
 - Plans are saved to `plans/` directory with descriptive filenames
