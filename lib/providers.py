@@ -35,26 +35,6 @@ CASKD_SPEC = ProviderDaemonSpec(
 )
 
 
-GASKD_SPEC = ProviderDaemonSpec(
-    daemon_key="gaskd",
-    protocol_prefix="gask",
-    state_file_name="gaskd.json",
-    log_file_name="gaskd.log",
-    idle_timeout_env="CCB_GASKD_IDLE_TIMEOUT_S",
-    lock_name="gaskd",
-)
-
-
-OASKD_SPEC = ProviderDaemonSpec(
-    daemon_key="oaskd",
-    protocol_prefix="oask",
-    state_file_name="oaskd.json",
-    log_file_name="oaskd.log",
-    idle_timeout_env="CCB_OASKD_IDLE_TIMEOUT_S",
-    lock_name="oaskd",
-)
-
-
 LASKD_SPEC = ProviderDaemonSpec(
     daemon_key="laskd",
     protocol_prefix="lask",
@@ -62,16 +42,6 @@ LASKD_SPEC = ProviderDaemonSpec(
     log_file_name="laskd.log",
     idle_timeout_env="CCB_LASKD_IDLE_TIMEOUT_S",
     lock_name="laskd",
-)
-
-
-DASKD_SPEC = ProviderDaemonSpec(
-    daemon_key="daskd",
-    protocol_prefix="dask",
-    state_file_name="daskd.json",
-    log_file_name="daskd.log",
-    idle_timeout_env="CCB_DASKD_IDLE_TIMEOUT_S",
-    lock_name="daskd",
 )
 
 
@@ -87,30 +57,6 @@ CASK_CLIENT_SPEC = ProviderClientSpec(
 )
 
 
-GASK_CLIENT_SPEC = ProviderClientSpec(
-    protocol_prefix="gask",
-    enabled_env="CCB_GASKD",
-    autostart_env_primary="CCB_GASKD_AUTOSTART",
-    autostart_env_legacy="CCB_AUTO_GASKD",
-    state_file_env="CCB_GASKD_STATE_FILE",
-    session_filename=".gemini-session",
-    daemon_bin_name="askd",
-    daemon_module="askd.daemon",
-)
-
-
-OASK_CLIENT_SPEC = ProviderClientSpec(
-    protocol_prefix="oask",
-    enabled_env="CCB_OASKD",
-    autostart_env_primary="CCB_OASKD_AUTOSTART",
-    autostart_env_legacy="CCB_AUTO_OASKD",
-    state_file_env="CCB_OASKD_STATE_FILE",
-    session_filename=".opencode-session",
-    daemon_bin_name="askd",
-    daemon_module="askd.daemon",
-)
-
-
 LASK_CLIENT_SPEC = ProviderClientSpec(
     protocol_prefix="lask",
     enabled_env="CCB_LASKD",
@@ -118,18 +64,6 @@ LASK_CLIENT_SPEC = ProviderClientSpec(
     autostart_env_legacy="CCB_AUTO_LASKD",
     state_file_env="CCB_LASKD_STATE_FILE",
     session_filename=".claude-session",
-    daemon_bin_name="askd",
-    daemon_module="askd.daemon",
-)
-
-
-DASK_CLIENT_SPEC = ProviderClientSpec(
-    protocol_prefix="dask",
-    enabled_env="CCB_DASKD",
-    autostart_env_primary="CCB_DASKD_AUTOSTART",
-    autostart_env_legacy="CCB_AUTO_DASKD",
-    state_file_env="CCB_DASKD_STATE_FILE",
-    session_filename=".droid-session",
     daemon_bin_name="askd",
     daemon_module="askd.daemon",
 )

@@ -247,8 +247,8 @@ def main() -> int:
         return 0
 
     parser = argparse.ArgumentParser(description="CCB Completion Hook")
-    parser.add_argument("--provider", required=True, help="Provider name (codex/gemini/opencode/droid)")
-    parser.add_argument("--caller", default="claude", help="Who initiated the request (claude/codex/droid)")
+    parser.add_argument("--provider", required=True, help="Provider name (codex/claude)")
+    parser.add_argument("--caller", default="claude", help="Who initiated the request (claude/codex)")
     parser.add_argument("--output", default="", help="Output file path (optional)")
     parser.add_argument("--reply", default="", help="Reply text (optional)")
     parser.add_argument("--req-id", default="", help="Request ID")
@@ -268,9 +268,7 @@ def main() -> int:
     # Construct notification message
     provider_names = {
         "codex": "Codex",
-        "gemini": "Gemini",
-        "opencode": "OpenCode",
-        "droid": "Droid",
+        "claude": "Claude",
     }
     provider_display = provider_names.get(provider, provider.capitalize())
     req_id = args.req_id or "unknown"
@@ -292,7 +290,6 @@ def main() -> int:
     session_files = {
         "claude": ".claude-session",
         "codex": ".codex-session",
-        "droid": ".droid-session",
     }
     session_filename = session_files.get(caller, ".claude-session")
 

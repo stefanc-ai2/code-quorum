@@ -6,7 +6,7 @@ Usage:
     ping <provider> [--session-file FILE]
 
 Providers:
-    gemini, codex, opencode, droid, claude
+    codex, claude
 """
 
 import sys
@@ -24,10 +24,7 @@ setup_windows_encoding()
 
 # Provider to communicator module and class mapping
 PROVIDER_COMMS = {
-    "gemini": ("gemini_comm", "GeminiCommunicator"),
     "codex": ("codex_comm", "CodexCommunicator"),
-    "opencode": ("opencode_comm", "OpenCodeCommunicator"),
-    "droid": ("droid_comm", "DroidCommunicator"),
     "claude": ("claude_comm", "ClaudeCommunicator"),
 }
 
@@ -36,7 +33,7 @@ def _usage():
     print("Usage: ping <provider> [--session-file FILE]", file=sys.stderr)
     print("", file=sys.stderr)
     print("Providers:", file=sys.stderr)
-    print("  gemini, codex, opencode, droid, claude", file=sys.stderr)
+    print("  codex, claude", file=sys.stderr)
 
 
 def main():

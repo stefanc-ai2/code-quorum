@@ -45,22 +45,11 @@ def test_cask_daemon_required_no_state(tmp_path: Path) -> None:
     assert "daemon required" in proc.stderr.lower()
 
 
-def test_gask_daemon_disabled_env(tmp_path: Path) -> None:
-    (tmp_path / ".gemini-session").write_text("{}", encoding="utf-8")
+def test_lask_daemon_disabled_env(tmp_path: Path) -> None:
+    (tmp_path / ".claude-session").write_text("{}", encoding="utf-8")
     env = dict(os.environ)
-    env["CCB_GASKD"] = "0"
-    env["CCB_GASKD_AUTOSTART"] = "0"
-    proc = _run("gask", ["hello"], cwd=tmp_path, env=env)
+    env["CCB_LASKD"] = "0"
+    env["CCB_LASKD_AUTOSTART"] = "0"
+    proc = _run("lask", ["hello"], cwd=tmp_path, env=env)
     assert proc.returncode == 1
-    assert "CCB_GASKD=0" in proc.stderr
-
-
-def test_oask_daemon_disabled_env(tmp_path: Path) -> None:
-    (tmp_path / ".opencode-session").write_text("{}", encoding="utf-8")
-    env = dict(os.environ)
-    env["CCB_OASKD"] = "0"
-    env["CCB_OASKD_AUTOSTART"] = "0"
-    proc = _run("oask", ["hello"], cwd=tmp_path, env=env)
-    assert proc.returncode == 1
-    assert "CCB_OASKD=0" in proc.stderr
-
+    assert "CCB_LASKD=0" in proc.stderr

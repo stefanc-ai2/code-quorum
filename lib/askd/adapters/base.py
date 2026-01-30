@@ -63,14 +63,13 @@ class BaseProviderAdapter(ABC):
     """
     Abstract base class for provider adapters.
 
-    Each provider (codex, gemini, opencode, droid, claude) implements
-    this interface to integrate with the unified daemon.
+    Each provider (codex, claude) implements this interface to integrate with the unified daemon.
     """
 
     @property
     @abstractmethod
     def key(self) -> str:
-        """Provider key (e.g., 'codex', 'gemini', 'opencode', 'droid', 'claude')."""
+        """Provider key (e.g., 'codex', 'claude')."""
         ...
 
     @property

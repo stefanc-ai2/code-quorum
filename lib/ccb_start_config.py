@@ -8,7 +8,7 @@ from typing import Optional, Tuple
 
 
 CONFIG_FILENAME = "ccb.config"
-DEFAULT_PROVIDERS = ["codex", "gemini", "opencode", "claude"]
+DEFAULT_PROVIDERS = ["codex", "claude"]
 
 
 @dataclass
@@ -17,7 +17,7 @@ class StartConfig:
     path: Optional[Path] = None
 
 
-_ALLOWED_PROVIDERS = {"codex", "gemini", "opencode", "claude", "droid"}
+_ALLOWED_PROVIDERS = {"codex", "claude"}
 
 
 def _parse_tokens(raw: str) -> list[str]:

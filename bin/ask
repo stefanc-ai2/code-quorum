@@ -6,7 +6,7 @@ Usage:
     ask <provider> [options] <message>
 
 Providers:
-    gemini, codex, opencode, droid, claude
+    codex, claude
 
 Modes:
     Default (async):  Background task with hook callback
@@ -15,7 +15,7 @@ Modes:
     --background:     Force background mode
 
 Examples:
-    ask gemini "12+12=?"
+    ask codex "12+12=?"
     ask claude --notify --no-wrap "Task completed"
 """
 
@@ -42,10 +42,7 @@ from cli_output import EXIT_ERROR, EXIT_OK
 
 # Provider to daemon command mapping
 PROVIDER_DAEMONS = {
-    "gemini": "gask",
     "codex": "cask",
-    "opencode": "oask",
-    "droid": "dask",
     "claude": "lask",
 }
 
@@ -255,7 +252,7 @@ def _usage() -> None:
     print("Usage: ask <provider> [options] <message>", file=sys.stderr)
     print("", file=sys.stderr)
     print("Providers:", file=sys.stderr)
-    print("  gemini, codex, opencode, droid, claude", file=sys.stderr)
+    print("  codex, claude", file=sys.stderr)
     print("", file=sys.stderr)
     print("Options:", file=sys.stderr)
     print("  -h, --help              Show this help message", file=sys.stderr)

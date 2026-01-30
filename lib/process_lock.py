@@ -1,7 +1,7 @@
 """
 process_lock.py - Per-provider, per-directory file lock to serialize request-response cycles.
 
-Each provider (codex, gemini, opencode) has its own lock file per working directory,
+Each provider (codex, claude) has its own lock file per working directory,
 allowing concurrent use across different directories while ensuring serial access
 within the same directory.
 """
@@ -47,7 +47,7 @@ class ProviderLock:
         """Initialize lock for a specific provider and working directory.
 
         Args:
-            provider: One of "codex", "gemini", "opencode"
+            provider: One of "codex", "claude"
             timeout: Max seconds to wait for lock acquisition
             cwd: Working directory for lock scope (defaults to current directory)
         """

@@ -6,7 +6,7 @@ Usage:
     autonew <provider>
 
 Providers:
-    gemini, codex, opencode, droid, claude
+    codex, claude
 
 This command directly sends '/new' to the provider's terminal pane
 without any context injection or protocol wrapping.
@@ -30,10 +30,7 @@ from terminal import get_backend_for_session
 
 # Provider to reset command mapping
 PROVIDER_COMMANDS = {
-    "gemini": "/clear",
     "codex": "/new",
-    "opencode": "/new",
-    "droid": "/new",
     "claude": "/new",
 }
 
@@ -42,7 +39,7 @@ def _usage() -> None:
     print("Usage: autonew <provider>", file=sys.stderr)
     print("", file=sys.stderr)
     print("Providers:", file=sys.stderr)
-    print("  gemini, codex, opencode, droid, claude", file=sys.stderr)
+    print("  codex, claude", file=sys.stderr)
     print("", file=sys.stderr)
     print("Sends /new to the provider's pane to start a new session.", file=sys.stderr)
 
