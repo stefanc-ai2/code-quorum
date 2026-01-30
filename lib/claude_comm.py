@@ -313,30 +313,40 @@ class ClaudeLogReader:
     def _latest_session(self) -> Optional[Path]:
         preferred = self._preferred_session
         index_session = self._parse_sessions_index()
-        scanned = self._scan_latest_session() if index_session is None else None
+        # sessions-index.json is helpful when it's complete, but in practice it can be stale or incomplete
+        # (e.g., only listing a single older session). Always keep a lightweight filesystem scan as a
+        # sanity check so we don't pin to an outdated session log.
+        scanned = self._scan_latest_session()
+
+        def _mtime(path: Path) -> float:
+            try:
+                return path.stat().st_mtime
+            except OSError:
+                return -1.0
+
+        def _pick_newest(*paths: Optional[Path]) -> Optional[Path]:
+            best: Optional[Path] = None
+            best_mtime = -1.0
+            for candidate in paths:
+                if not candidate or not candidate.exists():
+                    continue
+                mtime = _mtime(candidate)
+                if mtime > best_mtime:
+                    best = candidate
+                    best_mtime = mtime
+            return best
+
         if preferred and preferred.exists():
-            if index_session and index_session.exists():
-                try:
-                    if index_session.stat().st_mtime > preferred.stat().st_mtime:
-                        self._preferred_session = index_session
-                        return index_session
-                except OSError:
-                    pass
-                return preferred
-            if scanned and scanned.exists():
-                try:
-                    if scanned.stat().st_mtime > preferred.stat().st_mtime:
-                        self._preferred_session = scanned
-                        return scanned
-                except OSError:
-                    pass
+            newest = _pick_newest(preferred, index_session, scanned)
+            if newest:
+                self._preferred_session = newest
+                return newest
             return preferred
-        if index_session:
-            self._preferred_session = index_session
-            return index_session
-        if scanned:
-            self._preferred_session = scanned
-            return scanned
+
+        newest = _pick_newest(index_session, scanned)
+        if newest:
+            self._preferred_session = newest
+            return newest
         # Strict by default: only scan within this project's directory. Opt-in to any-project scan if needed.
         if os.environ.get("CLAUDE_ALLOW_ANY_PROJECT_SCAN") in ("1", "true", "yes"):
             any_latest = self._scan_latest_session_any_project()
