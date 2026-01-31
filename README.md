@@ -79,8 +79,22 @@ ask codex "Review this diff and suggest improvements."
 If you want the recipient to reply back to the caller (useful for `/pair`, `/poll`, `/all-plan` flows), replies are sent as another `ask`:
 
 ```bash
-# In the recipient pane:
-ask claude --reply-to <REQ_ID> "Here are my notes..."
+# In the recipient pane (send back to the driver):
+ask codex --reply-to <REQ_ID> --caller claude --no-wrap "Here are my notes..."
+# (or)
+ask claude --reply-to <REQ_ID> --caller codex --no-wrap "Here are my notes..."
+```
+
+Tip: when you *expect* reply-via-ask, avoid the default wrapper by using `--no-wrap`, set a stable id with `--req-id`, and include a `CCB_REQ_ID: <id>` line in your message so the recipient can copy it:
+
+```bash
+REQ_ID="$(python -c 'import secrets; print(secrets.token_hex(16))')"
+ask claude --no-wrap --req-id "$REQ_ID" <<EOF
+CCB_REQ_ID: $REQ_ID
+
+Review this and reply via:
+  ask codex --reply-to $REQ_ID --caller claude --no-wrap "<your notes>"
+EOF
 ```
 
 The reply is wrapped with protocol markers so the caller can identify it:
@@ -88,8 +102,9 @@ The reply is wrapped with protocol markers so the caller can identify it:
 ```
 CCB_REPLY: <REQ_ID>
 CCB_FROM: claude
+[CCB_RESULT] No reply required.
+
 ...message...
-CCB_DONE: <REQ_ID>
 ```
 
 ---

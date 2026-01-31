@@ -30,6 +30,11 @@
 - If you touch tmux behavior, validate on a system with tmux installed:
   `TERM=xterm-256color python -m pytest test/ -v --tb=short`.
 
+## Interaction / Protocol Rules
+
+- **Do not scrape panes** to collect responses (forbidden): do not use `wezterm cli get-text`, `tmux capture-pane`, or similar.
+- **Replies must arrive via reply-via-ask** (`ask --reply-to ... --no-wrap`); treat `ask` as async send-only.
+
 ## Commit & Pull Request Guidelines
 
 - Commit messages follow a Conventional-Commits style seen in history: `feat: …`, `fix: …`, `refactor: …`, `chore: …`, `release: …` (optional scope like `fix(askd_client): …`).

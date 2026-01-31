@@ -8,12 +8,18 @@ A provider is "mounted" if:
 
 Usage:
     ccb-mounted [CWD] [--json|--simple] [--include-inactive]
+
+Examples:
+    ccb-mounted
+    ccb-mounted --simple
+    ccb-mounted /path/to/project --json
 """
 
 import sys
 import os
 import json
 import socket
+import argparse
 from pathlib import Path
 
 script_dir = Path(__file__).resolve().parent
@@ -89,7 +95,14 @@ def pane_alive_for_session(session_data: dict) -> bool | None:
         return None
 
     try:
-        return bool(backend.is_alive(pane_id))
+        alive = bool(backend.is_alive(pane_id))
+        if alive:
+            return True
+        # If the backend couldn't probe liveness (e.g. wezterm cli list failed), treat as unknown.
+        last_err = getattr(backend, "last_list_error", None)
+        if last_err:
+            return None
+        return False
     except Exception:
         return None
 
@@ -118,21 +131,30 @@ def can_connect_localhost() -> bool:
 
 
 def main():
-    args = sys.argv[1:]
+    parser = argparse.ArgumentParser(
+        prog="ccb-mounted",
+        description="Check which CCB providers are mounted for a project directory.",
+    )
+    parser.add_argument("cwd", nargs="?", default=".", help="Project directory (default: current working directory).")
+    fmt_group = parser.add_mutually_exclusive_group()
+    fmt_group.add_argument("--json", action="store_true", help="Output JSON (default).")
+    fmt_group.add_argument("--simple", action="store_true", help="Output providers as a space-separated list.")
+    parser.add_argument(
+        "--include-inactive",
+        action="store_true",
+        help="Include inactive sessions (active=false).",
+    )
 
-    # Parse arguments
-    cwd = Path.cwd()
-    fmt = "--json"
-    include_inactive = False
-
-    for arg in args:
-        if arg.startswith("--"):
-            if arg == "--include-inactive":
-                include_inactive = True
-            else:
-                fmt = arg
-        else:
-            cwd = Path(arg)
+    args = parser.parse_args()
+    try:
+        cwd = Path(args.cwd).expanduser()
+    except Exception:
+        cwd = Path(args.cwd)
+    try:
+        cwd = cwd.resolve(strict=False)
+    except Exception:
+        pass
+    include_inactive = bool(args.include_inactive)
 
     # Check if we're in a sandboxed environment
     sandboxed = not can_connect_localhost()
@@ -158,7 +180,7 @@ def main():
             continue
         mounted.append(provider)
 
-    if fmt == "--simple":
+    if args.simple:
         print(" ".join(mounted))
     else:
         result = {"cwd": str(cwd), "mounted": mounted}

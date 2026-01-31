@@ -242,14 +242,18 @@ Send the design brief to mounted CLIs (from `mounted_providers`) for independent
 
 **2.1 Dispatch to Claude** (if "claude" in mounted_providers)
 
-Send a request via `ask` and capture the printed `req_id` as `CLAUDE_PLAN_REQ_ID`:
+Generate a stable 32-hex `req_id` as `CLAUDE_PLAN_REQ_ID`, then send the request via `ask` using that id:
 
 ```bash
-CCB_CALLER=codex ask claude <<'EOF'
+CLAUDE_PLAN_REQ_ID="$(python -c 'import secrets; print(secrets.token_hex(16))')"
+
+ask claude --no-wrap --req-id "$CLAUDE_PLAN_REQ_ID" <<'EOF'
+CCB_REQ_ID: <paste $CLAUDE_PLAN_REQ_ID>
+
 You are participating in /all-plan. Reply with design feedback only (no code changes).
 
 When done, send your design back to Codex via:
-  ask codex --reply-to=<req_id> --no-wrap "<your design>"
+  ask codex --reply-to=<req_id> --caller claude --no-wrap "<your design>"
 
 Design a solution for this requirement:
 
@@ -290,6 +294,7 @@ This flow is **multi-turn**. Do not poll or block.
 - Wait for Claude to reply in your pane via `ask codex --reply-to=<CLAUDE_PLAN_REQ_ID> ...`.
 - When the reply arrives, save it as `claude_design`.
 - Codex design → `codex_design`.
+- Do not scrape panes to collect replies (forbidden): no `wezterm cli get-text`, no `tmux capture-pane`, etc. The only supported mechanism is reply-via-ask.
 
 **3.2 Comparative Analysis**
 
@@ -374,11 +379,15 @@ Save as `merged_design_v1`.
 **4.2 Discussion Round 1 - Review & Critique**
 
 ```bash
-CCB_CALLER=codex ask claude <<'EOF'
+CLAUDE_REVIEW_1_REQ_ID="$(python -c 'import secrets; print(secrets.token_hex(16))')"
+
+ask claude --no-wrap --req-id "$CLAUDE_REVIEW_1_REQ_ID" <<'EOF'
+CCB_REQ_ID: <paste $CLAUDE_REVIEW_1_REQ_ID>
+
 You are participating in /all-plan. Reply with critique only (no code changes).
 
 When done, send your review back to Codex via:
-  ask codex --reply-to=<req_id> --no-wrap "<your review>"
+  ask codex --reply-to=<req_id> --caller claude --no-wrap "<your review>"
 
 Review this merged design based on all CLI inputs:
 
@@ -399,7 +408,7 @@ Provide specific recommendations for improvement.
 EOF
 ```
 
-Capture the printed `req_id` as `CLAUDE_REVIEW_1_REQ_ID`. This is **multi-turn**:
+This is **multi-turn**:
 - Wait for Claude to reply via `ask codex --reply-to=<CLAUDE_REVIEW_1_REQ_ID> ...`.
 - When it arrives, save it as `claude_review_1`.
 
@@ -408,11 +417,15 @@ Capture the printed `req_id` as `CLAUDE_REVIEW_1_REQ_ID`. This is **multi-turn**
 Based on Claude's review, refine the design:
 
 ```bash
-CCB_CALLER=codex ask claude <<'EOF'
+CLAUDE_REVIEW_2_REQ_ID="$(python -c 'import secrets; print(secrets.token_hex(16))')"
+
+ask claude --no-wrap --req-id "$CLAUDE_REVIEW_2_REQ_ID" <<'EOF'
+CCB_REQ_ID: <paste $CLAUDE_REVIEW_2_REQ_ID>
+
 You are participating in /all-plan. Reply with final suggestions only (no code changes).
 
 When done, send your response back to Codex via:
-  ask codex --reply-to=<req_id> --no-wrap "<your response>"
+  ask codex --reply-to=<req_id> --caller claude --no-wrap "<your response>"
 
 Refined design based on your feedback:
 
@@ -430,7 +443,7 @@ Final approval or additional suggestions?
 EOF
 ```
 
-Capture the printed `req_id` as `CLAUDE_REVIEW_2_REQ_ID`. This is **multi-turn**:
+This is **multi-turn**:
 - Wait for Claude to reply via `ask codex --reply-to=<CLAUDE_REVIEW_2_REQ_ID> ...`.
 - When it arrives, save it as `claude_review_2`.
 

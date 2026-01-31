@@ -3,7 +3,7 @@
 ask - Send a message to an AI provider's interactive pane (tmux/WezTerm).
 
 Usage:
-    ask <provider> [options] <message>
+    ask <provider> [options] [<message>...]
 
 Providers:
     codex, claude
@@ -11,10 +11,30 @@ Providers:
 Behavior:
     - Send-only (always async): prints the generated req_id and exits immediately.
     - Uses the provider session for the current working directory (project isolation).
+
+Examples:
+    # Send a one-liner
+    ask codex "Review this diff"
+
+    # Send a multi-line message
+    ask claude <<'EOF'
+    Please review these changes:
+    - ...
+    EOF
+
+    # Use a stable correlation id (32-hex) for reply-via-ask workflows (poll/pair/all-plan)
+    REQ_ID="$(python -c 'import secrets; print(secrets.token_hex(16))')"
+    ask claude --no-wrap --req-id "$REQ_ID" <<EOF
+    CCB_REQ_ID: $REQ_ID
+
+    Answer in 3 bullets and send it back via:
+      ask codex --reply-to $REQ_ID --caller claude --no-wrap "<your answer>"
+    EOF
 """
 
 from __future__ import annotations
 
+import argparse
 import os
 import sys
 from pathlib import Path
@@ -51,84 +71,110 @@ def _default_caller() -> str:
     return "claude"
 
 
-def _resolve_req_id() -> str:
+def _resolve_req_id(override_req_id: str | None) -> str:
+    explicit = (override_req_id or "").strip()
+    if explicit:
+        return explicit
     env_req_id = (os.environ.get("CCB_REQ_ID") or "").strip()
     return env_req_id or make_req_id()
 
 
-def _usage() -> None:
-    print("Usage: ask <provider> [options] <message>", file=sys.stderr)
-    print("", file=sys.stderr)
-    print("Providers:", file=sys.stderr)
-    print("  codex, claude", file=sys.stderr)
-    print("", file=sys.stderr)
-    print("Options:", file=sys.stderr)
-    print("  -h, --help              Show this help message", file=sys.stderr)
-    print("  --no-wrap               Don't wrap with CCB protocol markers", file=sys.stderr)
-    print("  --reply-to REQ_ID       Send a result/notification payload (implies --no-wrap)", file=sys.stderr)
+def _parser() -> argparse.ArgumentParser:
+    return argparse.ArgumentParser(
+        prog="ask",
+        description="Send a message to an AI provider's interactive pane (tmux/WezTerm).",
+        epilog=(
+            "Examples:\n"
+            "  ask codex \"Review this diff\"\n"
+            "  ask claude <<'EOF'\n"
+            "  Multi-line message...\n"
+            "  EOF\n"
+            "\n"
+            "  # Message begins with a dash\n"
+            "  ask codex -- --not-an-option\n"
+            "\n"
+            "  # Stable correlation id (32-hex) for reply-via-ask workflows\n"
+            "  REQ_ID=\"$(python -c 'import secrets; print(secrets.token_hex(16))')\"\n"
+            "  ask claude --no-wrap --req-id \"$REQ_ID\" <<EOF\n"
+            "  CCB_REQ_ID: $REQ_ID\n"
+            "\n"
+            "  Send your response back via:\n"
+            "    ask codex --reply-to $REQ_ID --caller claude --no-wrap \"<your answer>\"\n"
+            "  EOF\n"
+            "\n"
+            "  # Reply-via-ask payload without env vars\n"
+            "  ask codex --reply-to \"$REQ_ID\" --caller claude --no-wrap \"Here are my notes...\"\n"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
 
 
 def main(argv: list[str]) -> int:
+    parser = _parser()
+    parser.add_argument("provider", choices=("codex", "claude"), help="Target provider pane to send to.")
+    parser.add_argument(
+        "--no-wrap",
+        action="store_true",
+        help="Send message as-is (no protocol wrapper).",
+    )
+    parser.add_argument(
+        "--reply-to",
+        dest="reply_to_req_id",
+        default=None,
+        help="Send a reply-via-ask payload to REQ_ID (implies --no-wrap).",
+    )
+    parser.add_argument(
+        "--req-id",
+        dest="override_req_id",
+        default=None,
+        help="Override the request id (default: CCB_REQ_ID env var, else auto-generated 32-hex).",
+    )
+    parser.add_argument(
+        "--caller",
+        dest="caller",
+        default=None,
+        help="Override the `CCB_FROM` value in reply payloads (only used with --reply-to).",
+    )
+    parser.add_argument(
+        "message",
+        nargs="*",
+        help="Message text (or read from stdin). If your message starts with '-', use `--` before it.",
+    )
+
     if len(argv) <= 1:
-        _usage()
+        parser.print_help(sys.stderr)
         return EXIT_ERROR
 
-    # First argument must be the provider
-    provider = argv[1].lower()
+    try:
+        args = parser.parse_args(argv[1:])
+    except SystemExit as exc:
+        # Keep consistent exit codes (argparse uses 2 for parse errors).
+        return EXIT_OK if getattr(exc, "code", 1) == 0 else EXIT_ERROR
+    provider = str(args.provider).lower()
 
-    if provider in ("-h", "--help"):
-        _usage()
-        return EXIT_OK
-
-    if provider not in ("codex", "claude"):
-        print(f"[ERROR] Unknown provider: {provider}", file=sys.stderr)
-        print("[ERROR] Available: codex, claude", file=sys.stderr)
-        return EXIT_ERROR
-
-    # Parse remaining arguments
-    no_wrap = False
-    reply_to_req_id: str | None = None
-    parts: list[str] = []
-
-    it = iter(argv[2:])
-    for token in it:
-        if token in ("-h", "--help"):
-            _usage()
-            return EXIT_OK
-        if token.startswith("--reply-to="):
-            reply_to_req_id = token.split("=", 1)[1].strip() or None
-            continue
-        if token == "--reply-to":
-            try:
-                reply_to_req_id = (next(it) or "").strip() or None
-            except StopIteration:
-                print("[ERROR] --reply-to requires a req_id", file=sys.stderr)
-                return EXIT_ERROR
-            continue
-        if token == "--no-wrap":
-            no_wrap = True
-            continue
-        parts.append(token)
-
-    message = " ".join(parts).strip()
+    message = " ".join(args.message).strip()
     if not message and not sys.stdin.isatty():
         message = read_stdin_text().strip()
     if not message:
         print("[ERROR] Message cannot be empty", file=sys.stderr)
         return EXIT_ERROR
 
-    caller = _default_caller()
-    req_id = _resolve_req_id()
+    reply_to_req_id = (args.reply_to_req_id or "").strip() or None
+
+    caller = (str(args.caller).strip() if args.caller else _default_caller())
+    req_id = _resolve_req_id(args.override_req_id)
 
     if reply_to_req_id:
-        no_wrap = True
         outbound = wrap_reply_payload(
             reply_to_req_id=reply_to_req_id,
             from_provider=caller,
             message=message,
         )
+        # `ask --reply-to` is a payload send; no further wrapping.
+        outbound_req_id = reply_to_req_id
     else:
-        if no_wrap:
+        outbound_req_id = req_id
+        if args.no_wrap:
             outbound = (message or "").rstrip() + "\n"
         elif provider == "codex":
             outbound = wrap_codex_prompt(message, req_id)
@@ -148,7 +194,10 @@ def main(argv: list[str]) -> int:
 
     ok, pane_or_err = session.ensure_pane()
     if not ok:
-        print(f"[ERROR] Session pane not available: {pane_or_err}", file=sys.stderr)
+        backend = session.backend()
+        last_err = getattr(backend, "last_list_error", None)
+        extra = f" (backend: {last_err})" if last_err else ""
+        print(f"[ERROR] Session pane not available: {pane_or_err}{extra}", file=sys.stderr)
         return EXIT_ERROR
 
     backend = session.backend()
@@ -157,7 +206,7 @@ def main(argv: list[str]) -> int:
         return EXIT_ERROR
 
     backend.send_text(pane_or_err, outbound)
-    print(req_id)
+    print(outbound_req_id)
     return EXIT_OK
 
 

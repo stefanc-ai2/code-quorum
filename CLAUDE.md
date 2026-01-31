@@ -11,6 +11,7 @@ Current design constraints:
 - Platforms: macOS/Linux only
 - No background daemons
 - No polling commands; replies are delivered via reply-via-ask (`ask --reply-to ...`)
+- Do not scrape panes to collect replies (forbidden): no `wezterm cli get-text`, no `tmux capture-pane`, etc.
 
 **Pure Python**: no external runtime dependencies beyond the provider CLIs and a terminal backend.
 

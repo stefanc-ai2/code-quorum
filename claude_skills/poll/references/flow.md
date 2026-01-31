@@ -30,8 +30,9 @@ If `ccb-mounted` fails (non-zero) or returns invalid/empty output:
 
 If `respondents` is empty, proceed solo: answer the question yourself and clearly label it as a solo response.
 
-Generate a fresh correlation id you can match against later. Use it as the `req_id` for all broadcast `ask` calls:
-- `POLL_ID = <timestamp + random>` (example: `2026-01-30T12:34:56Z-8f3a`)
+Generate a fresh correlation id (32-hex) you can match against later. Use it as the `req_id` for all broadcast `ask` calls:
+- `POLL_ID = <32-hex id>` (example: `66094bea382bbce94019e3ea9218ac81`)
+  - Generate: `POLL_ID="$(python -c 'import secrets; print(secrets.token_hex(16))')"`
 - `POLL_DRIVER = {self}` (the provider that invoked `/poll`)
 
 ## Step 1: Clarify if needed
@@ -48,14 +49,20 @@ Send one request per respondent.
 
 Template:
 ```
+CCB_REQ_ID: <paste id>
+
 You are responding to a multi-provider poll. Provide an answer only — do not invoke `/poll`, `/pair`, or `/all-plan`, and do not implement changes.
 
 When you're done, send your answer back to the poll driver via reply-via-ask:
 1) Copy the `CCB_REQ_ID: <id>` line at the top of this message
 2) Run:
-   CCB_CALLER=<your provider> ask claude --reply-to <id> --no-wrap <<'EOF'
+   ask claude --reply-to <id> --caller <your provider> --no-wrap <<'EOF'
    <your answer>
    EOF
+   # (or, using env vars)
+   # CCB_CALLER=<your provider> ask claude --reply-to <id> --no-wrap <<'EOF'
+   # <your answer>
+   # EOF
 Do not reply in your own pane; send your answer via `ask --reply-to` so it arrives in the driver's pane.
 
 POLL_ID:
@@ -75,7 +82,13 @@ Reply with:
 
 Then run, once per respondent (sequentially; pause ~1s between providers):
 ```bash
-CCB_CALLER=claude CCB_REQ_ID="$POLL_ID" ask <provider> <<'EOF'
+CCB_CALLER=claude CCB_REQ_ID="$POLL_ID" ask <provider> --no-wrap <<'EOF'
+<message>
+EOF
+```
+Equivalent (flags):
+```bash
+ask <provider> --no-wrap --req-id "$POLL_ID" <<'EOF'
 <message>
 EOF
 ```
@@ -91,8 +104,8 @@ Use the same structure as the respondent template so your answer can be synthesi
 
 Notes:
 - On Windows native, avoid heredocs; use the `/ask` skill’s Windows instructions.
-  - PowerShell example: `$env:CCB_CALLER="claude"; $env:CCB_REQ_ID=$POLL_ID; Get-Content $msgFile -Raw | ask <provider>`
-  - cmd.exe example: `set CCB_CALLER=claude && set CCB_REQ_ID=%POLL_ID% && type %MSG_FILE% | ask <provider>`
+  - PowerShell example: `$env:CCB_CALLER="claude"; $env:CCB_REQ_ID=$POLL_ID; Get-Content $msgFile -Raw | ask <provider> --no-wrap`
+  - cmd.exe example: `set CCB_CALLER=claude && set CCB_REQ_ID=%POLL_ID% && type %MSG_FILE% | ask <provider> --no-wrap`
 
 ## Step 3: Collect answers (reply-via-ask)
 
@@ -103,6 +116,7 @@ Each reply payload should include:
 - `CCB_FROM: <provider>`
 
 Do not block on polling/sleeps. Continue working and incorporate answers as they arrive. If nothing arrives within `timeout_s`, proceed with partial responses and note which respondents did not reply.
+Do not scrape panes to collect answers (forbidden): no `wezterm cli get-text`, no `tmux capture-pane`, etc. The only supported mechanism is reply-via-ask.
 
 ## Step 4: Synthesize
 

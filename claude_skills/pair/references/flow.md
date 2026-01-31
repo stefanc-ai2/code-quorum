@@ -30,7 +30,7 @@ If `ccb-mounted` fails (non-zero) or returns invalid/empty output:
 - Otherwise proceed solo
 
 If `reviewers` is empty, proceed solo but still do the same internal checklist.
-If `reviewers` is non-empty, capture the printed `req_id` from each `ask` (e.g. `PAIR_REVIEW_REQ_ID_<provider>`) so you can match reply-via-ask feedback later.
+If `reviewers` is non-empty, generate a stable 32-hex `req_id` per reviewer (e.g. `PAIR_REVIEW_REQ_ID_<provider>`), use it as the `ask` request id (`CCB_REQ_ID=...` or `--req-id ...`), and include it in the message as `CCB_REQ_ID: <id>` so the reviewer can reply via reply-via-ask.
 
 ## Step 1: Plan
 
@@ -68,15 +68,21 @@ Provide reviewers with:
 
 Template:
 ```
+CCB_REQ_ID: <paste id>
+
 You are my pair-programming navigator (reviewer).
 Provide feedback only — do not invoke `/pair` and do not implement changes.
 
 When you're done, send your feedback back to me via reply-via-ask:
 1) Copy the `CCB_REQ_ID: <id>` line at the top of this message
 2) Run:
-   CCB_CALLER=<your provider> ask claude --reply-to <id> --no-wrap <<'EOF'
+   ask claude --reply-to <id> --caller <your provider> --no-wrap <<'EOF'
    <your feedback>
    EOF
+   # (or, using env vars)
+   # CCB_CALLER=<your provider> ask claude --reply-to <id> --no-wrap <<'EOF'
+   # <your feedback>
+   # EOF
 Do not reply in your own pane; send feedback via `ask --reply-to` so it arrives in my pane.
 
 PAIR_DRIVER:
@@ -105,12 +111,12 @@ Reply with:
 - Nice-to-have ideas
 ```
 
-Then run `ask <provider>` (using the platform-appropriate invocation for your environment).
+Then run `ask <provider> --no-wrap` (using the platform-appropriate invocation for your environment).
 Recommended: set `CCB_CALLER=claude` when invoking `ask` so reply payloads include the correct `CCB_FROM`.
 
 If you need a raw example for Linux/macOS/WSL:
 ```bash
-CCB_CALLER=claude ask <provider> <<'EOF'
+CCB_CALLER=claude ask <provider> --no-wrap <<'EOF'
 <message>
 EOF
 ```
@@ -126,6 +132,7 @@ Each reply payload should include:
 - `CCB_FROM: <provider>`
 
 Do not block on polling/sleeps. Continue working and incorporate feedback as it arrives. If nothing arrives within your time budget, proceed solo.
+Do not scrape panes to collect feedback (forbidden): no `wezterm cli get-text`, no `tmux capture-pane`, etc. The only supported mechanism is reply-via-ask.
 
 ## Step 5: Digest and merge
 

@@ -35,7 +35,7 @@ If you receive a request that begins with `CCB_REQ_ID: <req_id>`, treat it as a 
 
 When done, reply back to Codex via `ask`:
 ```bash
-Bash(CCB_CALLER=claude ask codex --reply-to "$REQ_ID" --no-wrap <<'EOF'
+Bash(ask codex --reply-to "$REQ_ID" --caller claude --no-wrap <<'EOF'
 <your result here>
 EOF)
 ```
