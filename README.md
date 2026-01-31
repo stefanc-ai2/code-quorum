@@ -4,7 +4,7 @@
 
 Split-pane collaboration between **Claude** and **Codex** using **tmux** or **WezTerm**.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: Unlicense](https://img.shields.io/badge/license-Unlicense-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS-lightgrey.svg)]()
 
@@ -112,4 +112,3 @@ ccb-mounted --json
 python -m compileall -q lib bin ccb test
 python -m pytest test/ -v --tb=short
 ```
-
