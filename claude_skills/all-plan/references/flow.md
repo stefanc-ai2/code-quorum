@@ -30,9 +30,7 @@ This returns JSON like:
 
 Parse the `mounted` array and **ONLY dispatch to providers in this list**.
 
-- If only `["codex","claude"]` → dispatch only to Codex (Claude designs independently)
-- If `["codex","gemini","claude"]` → dispatch to Codex and Gemini
-- If `["codex","gemini","opencode","claude"]` → dispatch to all three external providers
+- If `"codex"` is mounted → dispatch to Codex (Claude also designs independently)
 
 **Skip any provider not in the mounted list.** Do not attempt to dispatch to unmounted providers.
 
@@ -243,8 +241,15 @@ Send the design brief to mounted CLIs (from `mounted_providers`) for independent
 
 **2.1 Dispatch to Codex** (if "codex" in mounted_providers)
 
+Send a request via `ask` and capture the printed `req_id` as `CODEX_PLAN_REQ_ID`:
+
 ```bash
-Bash(cask <<'EOF'
+Bash(CCB_CALLER=claude ask codex <<'EOF'
+You are participating in /all-plan. Reply with design feedback only (no code changes).
+
+When done, send your design back to Claude via:
+  ask claude --reply-to=<req_id> --no-wrap "<your design>"
+
 Design a solution for this requirement:
 
 [design_brief]
@@ -258,50 +263,7 @@ Provide:
 - Acceptance criteria (max 3)
 
 Be specific and concrete.
-EOF
-, run_in_background=true)
-```
-
-**2.2 Dispatch to Gemini** (if "gemini" in mounted_providers)
-
-```bash
-Bash(gask <<'EOF'
-Design a solution for this requirement:
-
-[design_brief]
-
-Provide:
-- Goal (1 sentence)
-- Architecture approach
-- Implementation steps (3-7 key steps)
-- Technical considerations
-- Potential risks
-- Acceptance criteria (max 3)
-
-Be specific and concrete.
-EOF
-, run_in_background=true)
-```
-
-**2.3 Dispatch to OpenCode** (if "opencode" in mounted_providers)
-
-```bash
-Bash(oask <<'EOF'
-Design a solution for this requirement:
-
-[design_brief]
-
-Provide:
-- Goal (1 sentence)
-- Architecture approach
-- Implementation steps (3-7 key steps)
-- Technical considerations
-- Potential risks
-- Acceptance criteria (max 3)
-
-Be specific and concrete.
-EOF
-, run_in_background=true)
+EOF)
 ```
 
 **2.4 Claude's Independent Design**
@@ -320,12 +282,12 @@ Save as `claude_design`.
 
 ### Phase 3: Collect & Analyze All Designs
 
-**3.1 Wait for All Responses**
+**3.1 Collect Response(s)**
 
-Use `TaskOutput` to wait for background tasks from mounted providers only:
-- If "codex" was dispatched → save as `codex_design`
-- If "gemini" was dispatched → save as `gemini_design`
-- If "opencode" was dispatched → save as `opencode_design`
+This flow is **multi-turn**. Do not poll or block.
+
+- Wait for Codex to reply in your pane via `ask claude --reply-to=<CODEX_PLAN_REQ_ID> ...`.
+- When the reply arrives, save it as `codex_design`.
 
 **3.2 Comparative Analysis**
 
@@ -410,7 +372,12 @@ Save as `merged_design_v1`.
 **4.2 Discussion Round 1 - Review & Critique**
 
 ```bash
-Bash(cask <<'EOF'
+Bash(CCB_CALLER=claude ask codex <<'EOF'
+You are participating in /all-plan. Reply with critique only (no code changes).
+
+When done, send your review back to Claude via:
+  ask claude --reply-to=<req_id> --no-wrap "<your review>"
+
 Review this merged design based on all CLI inputs:
 
 COMPARATIVE ANALYSIS:
@@ -428,17 +395,24 @@ Analyze:
 
 Provide specific recommendations for improvement.
 EOF
-, run_in_background=true)
+)
 ```
 
-Wait with `TaskOutput`. Save as `codex_review_1`.
+Capture the printed `req_id` as `CODEX_REVIEW_1_REQ_ID`. This is **multi-turn**:
+- Wait for Codex to reply via `ask claude --reply-to=<CODEX_REVIEW_1_REQ_ID> ...`.
+- When it arrives, save it as `codex_review_1`.
 
 **4.3 Discussion Round 2 - Resolve & Finalize**
 
 Based on Codex's review, refine the design:
 
 ```bash
-Bash(cask <<'EOF'
+Bash(CCB_CALLER=claude ask codex <<'EOF'
+You are participating in /all-plan. Reply with final suggestions only (no code changes).
+
+When done, send your response back to Claude via:
+  ask claude --reply-to=<req_id> --no-wrap "<your response>"
+
 Refined design based on your feedback:
 
 MERGED DESIGN v2:
@@ -453,10 +427,12 @@ Remaining concerns:
 
 Final approval or additional suggestions?
 EOF
-, run_in_background=true)
+)
 ```
 
-Wait with `TaskOutput`. Save as `codex_review_2`.
+Capture the printed `req_id` as `CODEX_REVIEW_2_REQ_ID`. This is **multi-turn**:
+- Wait for Codex to reply via `ask claude --reply-to=<CODEX_REVIEW_2_REQ_ID> ...`.
+- When it arrives, save it as `codex_review_2`.
 
 ---
 
@@ -632,8 +608,7 @@ Next: Review the plan and proceed with implementation when ready.
 
 - This skill is designed for complex features or architectural decisions
 - For simple tasks, use dual-design or direct implementation instead
-- All background tasks should use `run_in_background=true`
-- Always wait for task completion with `TaskOutput` before proceeding
+- This flow is multi-turn: dispatch via `ask`, then continue once reply-via-ask results arrive in-pane
 - **CRITICAL**: Always run `ccb-mounted` first to detect which providers are active. Only dispatch to providers in the `mounted` array
 - If only Claude and Codex are mounted, the collaboration will be between those two only
 - Plans are saved to `plans/` directory with descriptive filenames

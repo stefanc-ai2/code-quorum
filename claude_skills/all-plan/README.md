@@ -1,6 +1,6 @@
 # All-Plan Skill
 
-Collaborative planning with all mounted CLIs (Claude, Codex, Gemini, OpenCode) for comprehensive solution design.
+Collaborative planning with all mounted CLIs (Claude, Codex) for comprehensive solution design.
 
 ## Usage
 
