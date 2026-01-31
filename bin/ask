@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ask - Unified command to send messages to different AI providers.
+ask - Send a message to an AI provider's interactive pane (tmux/WezTerm).
 
 Usage:
     ask <provider> [options] <message>
@@ -8,27 +8,16 @@ Usage:
 Providers:
     codex, claude
 
-Modes:
-    Default (async):  Background task with hook callback
-    --notify:         Sync send, no wait for reply (for notifications)
-    --foreground:     Run in foreground (no nohup/background)
-    --background:     Force background mode
-
-Examples:
-    ask codex "12+12=?"
-    ask claude --notify --no-wrap "Task completed"
+Behavior:
+    - Send-only (always async): prints the generated req_id and exits immediately.
+    - Uses the provider session for the current working directory (project isolation).
 """
 
 from __future__ import annotations
 
 import os
-import shlex
-import subprocess
 import sys
-import tempfile
-from datetime import datetime
 from pathlib import Path
-import time
 
 script_dir = Path(__file__).resolve().parent
 lib_dir = script_dir.parent / "lib"
@@ -38,162 +27,10 @@ from compat import read_stdin_text, setup_windows_encoding
 setup_windows_encoding()
 
 from cli_output import EXIT_ERROR, EXIT_OK
-from ccb_protocol import wrap_reply_payload
-
-
-# Provider to daemon command mapping
-PROVIDER_DAEMONS = {
-    "codex": "cask",
-    "claude": "lask",
-}
-
-
-def _use_unified_daemon() -> bool:
-    """Check if unified askd daemon should be used (default: True)."""
-    val = (os.environ.get("CCB_UNIFIED_ASKD") or "").strip().lower()
-    if val in ("0", "false", "no", "off"):
-        return False
-    return True  # Default to unified daemon
-
-
-def _askd_autostart_enabled() -> bool:
-    """
-    Whether `ask` should auto-start `askd` when using the unified daemon.
-
-    Default: enabled (CCB_ASKD_AUTOSTART not set, or truthy).
-    """
-    val = (os.environ.get("CCB_ASKD_AUTOSTART") or "").strip().lower()
-    if not val:
-        return True
-    return val not in ("0", "false", "no", "off")
-
-
-def _askd_cmd() -> list[str] | None:
-    askd_path = script_dir / "askd"
-    if askd_path.exists():
-        return [str(askd_path)]
-    return None
-
-
-def _ensure_askd_running(timeout_s: float = 1.5) -> bool:
-    import askd_rpc
-    from askd_runtime import state_file_path
-
-    state_file = state_file_path("askd.json")
-    if askd_rpc.ping_daemon("ask", 0.2, state_file):
-        return True
-
-    if not _askd_autostart_enabled():
-        return False
-
-    cmd = _askd_cmd()
-    if not cmd:
-        return False
-
-    env = os.environ.copy()
-    env.setdefault("CCB_ASKD_IDLE_TIMEOUT_S", "3600")
-
-    try:
-        subprocess.Popen(
-            cmd,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            env=env,
-            start_new_session=True,
-        )
-    except Exception as e:
-        if _env_bool("CCB_DEBUG", False):
-            print(f"[DEBUG] askd autostart failed: {e}", file=sys.stderr)
-        return False
-
-    raw_startup_timeout = (os.environ.get("CCB_ASKD_STARTUP_TIMEOUT_S") or "").strip()
-    if raw_startup_timeout:
-        try:
-            startup_timeout_s = float(raw_startup_timeout)
-        except (TypeError, ValueError):
-            startup_timeout_s = timeout_s
-    else:
-        startup_timeout_s = timeout_s
-    deadline = time.time() + max(0.1, startup_timeout_s)
-    while time.time() < deadline:
-        if askd_rpc.ping_daemon("ask", 0.2, state_file):
-            return True
-        time.sleep(0.05)
-    return False
-
-
-def _send_via_unified_daemon(
-    provider: str,
-    message: str,
-    timeout: float,
-    no_wrap: bool,
-    caller: str,
-) -> int:
-    """Send request via unified askd daemon."""
-    import json
-    import socket
-
-    from askd_runtime import state_file_path
-    import askd_rpc
-
-    state_file = state_file_path("askd.json")
-    if not _ensure_askd_running():
-        print("[ERROR] Unified askd daemon not running", file=sys.stderr)
-        print("[ERROR] Hint: start it with `askd` or run via `ccb` (managed mode).", file=sys.stderr)
-        return EXIT_ERROR
-
-    state = askd_rpc.read_state(state_file)
-    if not state:
-        print("[ERROR] Unified askd daemon state missing/invalid", file=sys.stderr)
-        return EXIT_ERROR
-
-    host = state.get("connect_host") or state.get("host") or "127.0.0.1"
-    port = int(state.get("port") or 0)
-    token = state.get("token") or ""
-
-    if not port:
-        print("[ERROR] Invalid askd state", file=sys.stderr)
-        return EXIT_ERROR
-
-    req = {
-        "type": "ask.request",
-        "v": 1,
-        "id": make_task_id(),
-        "token": token,
-        "provider": provider,
-        "work_dir": os.getcwd(),
-        "timeout_s": timeout,
-        "message": message,
-        "no_wrap": no_wrap,
-        "caller": caller,
-    }
-
-    try:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(timeout + 10 if timeout > 0 else 3610)
-        sock.connect((host, port))
-        sock.sendall((json.dumps(req) + "\n").encode("utf-8"))
-
-        data = b""
-        while True:
-            chunk = sock.recv(4096)
-            if not chunk:
-                break
-            data += chunk
-            if b"\n" in data:
-                break
-
-        sock.close()
-        resp = json.loads(data.decode("utf-8").strip())
-        exit_code = int(resp.get("exit_code") or 0)
-        reply = resp.get("reply") or ""
-        if reply:
-            print(reply)
-        return exit_code
-    except Exception as e:
-        print(f"[ERROR] {e}", file=sys.stderr)
-        return EXIT_ERROR
+from caskd_session import load_project_session as load_codex_session
+from ccb_protocol import make_req_id, wrap_codex_prompt, wrap_reply_payload
+from laskd_protocol import wrap_claude_prompt
+from laskd_session import load_project_session as load_claude_session
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
@@ -201,19 +38,6 @@ def _env_bool(name: str, default: bool = False) -> bool:
     if not val:
         return default
     return val not in ("0", "false", "no", "off")
-
-
-def _default_foreground() -> bool:
-    # Allow explicit override
-    if _env_bool("CCB_ASK_BACKGROUND", False):
-        return False
-    if _env_bool("CCB_ASK_FOREGROUND", False):
-        return True
-    # If CCB_CALLER is set, use background (nohup) mode
-    if os.environ.get("CCB_CALLER"):
-        return False
-    # No caller set, use foreground mode
-    return True
 
 
 def _default_caller() -> str:
@@ -227,11 +51,9 @@ def _default_caller() -> str:
     return "claude"
 
 
-def make_task_id() -> str:
-    """Generate task ID: YYYYMMDD-HHMMSS-mmm-PID"""
-    now = datetime.now()
-    ms = now.microsecond // 1000
-    return f"{now.strftime('%Y%m%d-%H%M%S')}-{ms:03d}-{os.getpid()}"
+def _resolve_req_id() -> str:
+    env_req_id = (os.environ.get("CCB_REQ_ID") or "").strip()
+    return env_req_id or make_req_id()
 
 
 def _usage() -> None:
@@ -242,10 +64,6 @@ def _usage() -> None:
     print("", file=sys.stderr)
     print("Options:", file=sys.stderr)
     print("  -h, --help              Show this help message", file=sys.stderr)
-    print("  -t, --timeout SECONDS   Request timeout (default: 3600)", file=sys.stderr)
-    print("  --notify                Sync send, no wait for reply (for notifications)", file=sys.stderr)
-    print("  --foreground            Run in foreground (no nohup/background)", file=sys.stderr)
-    print("  --background            Force background mode", file=sys.stderr)
     print("  --no-wrap               Don't wrap with CCB protocol markers", file=sys.stderr)
     print("  --reply-to REQ_ID       Send a result/notification payload (implies --no-wrap)", file=sys.stderr)
 
@@ -262,19 +80,14 @@ def main(argv: list[str]) -> int:
         _usage()
         return EXIT_OK
 
-    if provider not in PROVIDER_DAEMONS:
+    if provider not in ("codex", "claude"):
         print(f"[ERROR] Unknown provider: {provider}", file=sys.stderr)
-        print(f"[ERROR] Available: {', '.join(PROVIDER_DAEMONS.keys())}", file=sys.stderr)
+        print("[ERROR] Available: codex, claude", file=sys.stderr)
         return EXIT_ERROR
 
-    daemon_cmd = PROVIDER_DAEMONS[provider]
-
     # Parse remaining arguments
-    timeout: float = 3600.0
-    notify_mode = False
     no_wrap = False
     reply_to_req_id: str | None = None
-    foreground_mode = _default_foreground()
     parts: list[str] = []
 
     it = iter(argv[2:])
@@ -282,19 +95,6 @@ def main(argv: list[str]) -> int:
         if token in ("-h", "--help"):
             _usage()
             return EXIT_OK
-        if token in ("-t", "--timeout"):
-            try:
-                timeout = float(next(it))
-            except StopIteration:
-                print("[ERROR] --timeout requires a number", file=sys.stderr)
-                return EXIT_ERROR
-            except ValueError:
-                print("[ERROR] --timeout must be a number", file=sys.stderr)
-                return EXIT_ERROR
-            continue
-        if token == "--notify":
-            notify_mode = True
-            continue
         if token.startswith("--reply-to="):
             reply_to_req_id = token.split("=", 1)[1].strip() or None
             continue
@@ -304,12 +104,6 @@ def main(argv: list[str]) -> int:
             except StopIteration:
                 print("[ERROR] --reply-to requires a req_id", file=sys.stderr)
                 return EXIT_ERROR
-            continue
-        if token == "--foreground":
-            foreground_mode = True
-            continue
-        if token == "--background":
-            foreground_mode = False
             continue
         if token == "--no-wrap":
             no_wrap = True
@@ -324,116 +118,46 @@ def main(argv: list[str]) -> int:
         return EXIT_ERROR
 
     caller = _default_caller()
+    req_id = _resolve_req_id()
+
     if reply_to_req_id:
         no_wrap = True
-        message = wrap_reply_payload(
+        outbound = wrap_reply_payload(
             reply_to_req_id=reply_to_req_id,
             from_provider=caller,
             message=message,
         )
-
-    # Use unified daemon if enabled (CCB_UNIFIED_ASKD=1)
-    if _use_unified_daemon() and foreground_mode:
-        return _send_via_unified_daemon(provider, message, timeout, no_wrap, caller)
-
-    # Notify mode: sync send, no wait for reply (used for hook notifications)
-    if notify_mode:
-        cmd = [daemon_cmd, "--sync"]
+    else:
         if no_wrap:
-            cmd.append("--no-wrap")
-        try:
-            result = subprocess.run(
-                cmd,
-                input=message,
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
-            return result.returncode
-        except subprocess.TimeoutExpired:
-            return EXIT_OK
-        except Exception as e:
-            print(f"[ERROR] {e}", file=sys.stderr)
-            return EXIT_ERROR
+            outbound = (message or "").rstrip() + "\n"
+        elif provider == "codex":
+            outbound = wrap_codex_prompt(message, req_id)
+        else:
+            outbound = wrap_claude_prompt(message, req_id)
 
-    # Foreground mode: run provider directly (avoid background cleanup in managed envs)
-    if foreground_mode:
-        cmd = [daemon_cmd, "--sync", "--timeout", str(timeout)]
-        if no_wrap and provider == "claude":
-            cmd.append("--no-wrap")
-        env = os.environ.copy()
-        if not env.get("CCB_CALLER"):
-            env["CCB_CALLER"] = _default_caller()
-        try:
-            result = subprocess.run(cmd, input=message, text=True, env=env)
-            return result.returncode
-        except Exception as e:
-            print(f"[ERROR] {e}", file=sys.stderr)
-            return EXIT_ERROR
+    work_dir = Path.cwd()
+    if provider == "codex":
+        session = load_codex_session(work_dir)
+    else:
+        session = load_claude_session(work_dir)
 
-    # Default async mode: background task via nohup, using unified askd daemon
-    if _use_unified_daemon() and not _ensure_askd_running():
-        print("[ERROR] Unified askd daemon not running", file=sys.stderr)
-        print("[ERROR] Hint: start it with `askd` or run via `ccb` (managed mode).", file=sys.stderr)
+    if not session:
+        print(f"[ERROR] No active {provider} session found for this directory.", file=sys.stderr)
+        print(f"[ERROR] Run `ccb {provider}` in this project first.", file=sys.stderr)
         return EXIT_ERROR
 
-    task_id = make_task_id()
-    log_dir = Path(tempfile.gettempdir()) / "ccb-tasks"
-    log_dir.mkdir(parents=True, exist_ok=True)
-    # Best-effort hardening: avoid leaking prompts/replies in multi-user environments.
-    try:
-        os.chmod(log_dir, 0o700)
-    except Exception:
-        pass
-    log_file = log_dir / f"ask-{provider}-{task_id}.log"
-    try:
-        fd = os.open(str(log_file), os.O_CREAT | os.O_TRUNC | os.O_WRONLY, 0o600)
-        os.close(fd)
-    except Exception:
-        pass
+    ok, pane_or_err = session.ensure_pane()
+    if not ok:
+        print(f"[ERROR] Session pane not available: {pane_or_err}", file=sys.stderr)
+        return EXIT_ERROR
 
-    # Detect caller from environment or default to "claude"
-    caller = _default_caller()
+    backend = session.backend()
+    if not backend:
+        print("[ERROR] Terminal backend not available", file=sys.stderr)
+        return EXIT_ERROR
 
-    # Get the path to this script for recursive call with --foreground
-    ask_cmd = str(Path(__file__).resolve())
-    ccb_run_dir = (os.environ.get("CCB_RUN_DIR") or "").strip()
-    ccb_run_dir_sh = shlex.quote(ccb_run_dir) if ccb_run_dir else ""
-    work_dir = os.getcwd()
-    work_dir_sh = shlex.quote(work_dir)
-    # Unix: run detached; call ask --foreground to use unified daemon.
-    bg_script = f'''
-export CCB_REQ_ID="{task_id}"
-export CCB_CALLER="{caller}"
-export CCB_WORK_DIR={work_dir_sh}
-{f'export CCB_RUN_DIR={ccb_run_dir_sh}' if ccb_run_dir else ''}
-python3 "{ask_cmd}" {provider} --foreground --timeout {timeout} <<'ASKEOF'
-{message}
-ASKEOF
-'''
-    # Write script to temp file for detached execution
-    script_file = log_dir / f"ask-{provider}-{task_id}.sh"
-    script_file.write_text(bg_script, encoding="utf-8")
-    try:
-        script_file.chmod(0o700)
-    except Exception:
-        pass
-
-    try:
-        log_handle = open(log_file, "a", encoding="utf-8")
-    except Exception:
-        log_handle = open(log_file, "a")
-
-    subprocess.Popen(
-        ["sh", str(script_file)],
-        stdin=subprocess.DEVNULL,
-        stdout=log_handle,
-        stderr=subprocess.STDOUT,
-        start_new_session=True,
-        close_fds=True,
-    )
-
-    print(f"{provider.capitalize()} processing (task: {task_id}, log: {log_file})...")
+    backend.send_text(pane_or_err, outbound)
+    print(req_id)
     return EXIT_OK
 
 

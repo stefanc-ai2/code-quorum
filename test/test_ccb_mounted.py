@@ -26,7 +26,7 @@ def test_ccb_mounted_filters_inactive_sessions_simple(tmp_path, monkeypatch, cap
     (work_dir / ".ccb_config" / ".claude-session").write_text(json.dumps({"active": False}), encoding="utf-8")
 
     monkeypatch.setattr(ccb_mounted, "can_connect_localhost", lambda: True)
-    monkeypatch.setattr(ccb_mounted, "ping_unified_askd", lambda: True)
+    monkeypatch.setattr(ccb_mounted, "pane_alive_for_session", lambda _data: None)
 
     monkeypatch.setattr(ccb_mounted.sys, "argv", ["ccb-mounted", str(work_dir), "--simple"])
     ccb_mounted.main()
@@ -46,7 +46,7 @@ def test_ccb_mounted_include_inactive(tmp_path, monkeypatch, capsys) -> None:
     (work_dir / ".ccb_config" / ".claude-session").write_text(json.dumps({"active": False}), encoding="utf-8")
 
     monkeypatch.setattr(ccb_mounted, "can_connect_localhost", lambda: True)
-    monkeypatch.setattr(ccb_mounted, "ping_unified_askd", lambda: True)
+    monkeypatch.setattr(ccb_mounted, "pane_alive_for_session", lambda _data: None)
 
     monkeypatch.setattr(ccb_mounted.sys, "argv", ["ccb-mounted", str(work_dir), "--json", "--include-inactive"])
     ccb_mounted.main()
@@ -67,7 +67,7 @@ def test_ccb_mounted_missing_active_treated_as_active(tmp_path, monkeypatch, cap
     (work_dir / ".ccb_config" / ".claude-session").write_text(json.dumps({"active": False}), encoding="utf-8")
 
     monkeypatch.setattr(ccb_mounted, "can_connect_localhost", lambda: True)
-    monkeypatch.setattr(ccb_mounted, "ping_unified_askd", lambda: True)
+    monkeypatch.setattr(ccb_mounted, "pane_alive_for_session", lambda _data: None)
 
     monkeypatch.setattr(ccb_mounted.sys, "argv", ["ccb-mounted", str(work_dir), "--json"])
     ccb_mounted.main()
@@ -88,7 +88,7 @@ def test_ccb_mounted_malformed_json_treated_as_active(tmp_path, monkeypatch, cap
     (work_dir / ".ccb_config" / ".claude-session").write_text(json.dumps({"active": False}), encoding="utf-8")
 
     monkeypatch.setattr(ccb_mounted, "can_connect_localhost", lambda: True)
-    monkeypatch.setattr(ccb_mounted, "ping_unified_askd", lambda: True)
+    monkeypatch.setattr(ccb_mounted, "pane_alive_for_session", lambda _data: None)
 
     monkeypatch.setattr(ccb_mounted.sys, "argv", ["ccb-mounted", str(work_dir), "--json"])
     ccb_mounted.main()
@@ -109,7 +109,7 @@ def test_ccb_mounted_active_null_treated_as_active(tmp_path, monkeypatch, capsys
     (work_dir / ".ccb_config" / ".claude-session").write_text(json.dumps({"active": False}), encoding="utf-8")
 
     monkeypatch.setattr(ccb_mounted, "can_connect_localhost", lambda: True)
-    monkeypatch.setattr(ccb_mounted, "ping_unified_askd", lambda: True)
+    monkeypatch.setattr(ccb_mounted, "pane_alive_for_session", lambda _data: None)
 
     monkeypatch.setattr(ccb_mounted.sys, "argv", ["ccb-mounted", str(work_dir), "--json"])
     ccb_mounted.main()

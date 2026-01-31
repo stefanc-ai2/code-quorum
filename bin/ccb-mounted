@@ -4,10 +4,7 @@ ccb-mounted - Check which CCB providers are mounted.
 
 A provider is "mounted" if:
 1. Session file exists (.ccb_config/.{provider}-session or .{provider}-session) and is active
-2. Daemon is responsive (via RPC ping) - OR socket access is blocked (sandbox mode)
-
-Supports both unified askd daemon and legacy per-provider daemons.
-Falls back to session-file-only checks in sandboxed environments.
+2. Pane is reachable/alive (best-effort) - OR socket access is blocked (sandbox mode)
 
 Usage:
     ccb-mounted [CWD] [--json|--simple] [--include-inactive]
@@ -22,6 +19,8 @@ from pathlib import Path
 script_dir = Path(__file__).resolve().parent
 lib_dir = script_dir.parent / "lib"
 sys.path.insert(0, str(lib_dir))
+
+from terminal import get_backend_for_session, get_pane_id_from_session
 
 PROVIDERS = ["codex", "claude"]
 
@@ -56,6 +55,45 @@ def session_file_is_active(path: Path) -> bool:
     return True
 
 
+def read_session_data(path: Path) -> dict:
+    try:
+        raw = path.read_text(encoding="utf-8-sig", errors="replace")
+        data = json.loads(raw)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def pane_alive_for_session(session_data: dict) -> bool | None:
+    """
+    Best-effort liveness check for a session's pane.
+
+    Returns:
+      - True: pane is alive
+      - False: pane is definitively dead
+      - None: unknown (missing data or cannot probe)
+    """
+    if not isinstance(session_data, dict) or not session_data:
+        return None
+
+    try:
+        backend = get_backend_for_session(session_data)
+    except Exception:
+        backend = None
+    if not backend:
+        return None
+
+    pane_id = get_pane_id_from_session(session_data) or session_data.get("claude_pane_id")
+    pane_id = str(pane_id or "").strip()
+    if not pane_id:
+        return None
+
+    try:
+        return bool(backend.is_alive(pane_id))
+    except Exception:
+        return None
+
+
 def can_connect_localhost() -> bool:
     """Test if we can make localhost socket connections (sandbox check)."""
     try:
@@ -77,35 +115,6 @@ def can_connect_localhost() -> bool:
             sock.close()
     except Exception:
         return True  # Assume we can connect if test fails unexpectedly
-    return True
-
-
-def ping_unified_askd() -> bool:
-    """Ping the unified askd daemon."""
-    try:
-        from askd import daemon as askd_daemon
-        return askd_daemon.ping_daemon(timeout_s=0.5)
-    except Exception:
-        return False
-
-
-def ping_provider_daemon(provider: str) -> bool:
-    """Ping a provider-specific daemon (legacy mode)."""
-    daemon_modules = {
-        "codex": "caskd_daemon",
-        "claude": "laskd_daemon",
-    }
-    module_name = daemon_modules.get(provider)
-    if not module_name:
-        return False
-    try:
-        module = __import__(module_name)
-        ping = getattr(module, "ping_daemon", None)
-        if ping:
-            return ping(timeout_s=0.5)
-        return False
-    except Exception:
-        return False
 
 
 def main():
@@ -128,9 +137,6 @@ def main():
     # Check if we're in a sandboxed environment
     sandboxed = not can_connect_localhost()
 
-    # Check if unified askd is running (skip if sandboxed)
-    unified_askd_running = False if sandboxed else ping_unified_askd()
-
     mounted = []
 
     for provider in PROVIDERS:
@@ -146,8 +152,11 @@ def main():
             mounted.append(provider)
             continue
 
-        if unified_askd_running or ping_provider_daemon(provider):
-            mounted.append(provider)
+        data = read_session_data(session_file)
+        alive = pane_alive_for_session(data)
+        if alive is False:
+            continue
+        mounted.append(provider)
 
     if fmt == "--simple":
         print(" ".join(mounted))
