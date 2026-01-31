@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-import pane_registry
+import session_registry
 from codex_session import load_project_session as load_codex_session
 from claude_session import load_project_session as load_claude_session
 from project_id import compute_ccb_project_id
@@ -20,7 +20,7 @@ class _AliveBackend:
 def _write_registry_record(*, home: Path, session_id: str, record: dict) -> None:
     run_dir = home / ".ccb" / "run"
     run_dir.mkdir(parents=True, exist_ok=True)
-    path = run_dir / f"{pane_registry.REGISTRY_PREFIX}{session_id}{pane_registry.REGISTRY_SUFFIX}"
+    path = run_dir / f"{session_registry.REGISTRY_PREFIX}{session_id}{session_registry.REGISTRY_SUFFIX}"
     path.write_text(json.dumps(record, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
@@ -39,7 +39,7 @@ def test_claude_session_isolated_from_env_cross_project(tmp_path: Path, monkeypa
     pid_b = compute_ccb_project_id(repo_b)
 
     # Avoid tmux/wezterm dependencies in registry scans.
-    monkeypatch.setattr(pane_registry, "get_backend_for_session", lambda _data: _AliveBackend())
+    monkeypatch.setattr(session_registry, "get_backend_for_session", lambda _data: _AliveBackend())
 
     session_a = "sess_a"
     session_b = "sess_b"
@@ -96,7 +96,7 @@ def test_claude_session_allow_cross_project_when_enabled(tmp_path: Path, monkeyp
     pid_a = compute_ccb_project_id(repo_a)
     pid_b = compute_ccb_project_id(repo_b)
 
-    monkeypatch.setattr(pane_registry, "get_backend_for_session", lambda _data: _AliveBackend())
+    monkeypatch.setattr(session_registry, "get_backend_for_session", lambda _data: _AliveBackend())
 
     session_a = "sess_a"
     session_b = "sess_b"

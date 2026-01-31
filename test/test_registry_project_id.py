@@ -7,8 +7,8 @@ from typing import Optional
 
 import pytest
 
-import pane_registry
-from pane_registry import load_registry_by_project_id, upsert_registry
+import session_registry
+from session_registry import load_registry_by_project_id, upsert_registry
 from project_id import compute_ccb_project_id
 
 
@@ -34,7 +34,7 @@ def _write_registry_file(home: Path, session_id: str, payload: dict) -> Path:
 def test_upsert_registry_merges_providers(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("USERPROFILE", str(tmp_path))
-    monkeypatch.setattr(pane_registry, "get_backend_for_session", lambda _rec: _FakeBackend(alive={"%1"}))
+    monkeypatch.setattr(session_registry, "get_backend_for_session", lambda _rec: _FakeBackend(alive={"%1"}))
 
     work_dir = tmp_path / "proj"
     work_dir.mkdir()
@@ -57,7 +57,7 @@ def test_upsert_registry_merges_providers(tmp_path: Path, monkeypatch: pytest.Mo
             "ccb_project_id": pid,
             "work_dir": str(work_dir),
             "terminal": "tmux",
-            "providers": {"gemini": {"pane_id": "%1", "session_file": str(work_dir / ".ccb_config" / ".gemini-session")}},
+            "providers": {"claude": {"pane_id": "%1", "session_file": str(work_dir / ".ccb_config" / ".claude-session")}},
         }
     )
     assert ok2 is True
@@ -67,7 +67,7 @@ def test_upsert_registry_merges_providers(tmp_path: Path, monkeypatch: pytest.Mo
     assert data["ccb_project_id"] == pid
     assert "providers" in data
     assert "codex" in data["providers"]
-    assert "gemini" in data["providers"]
+    assert "claude" in data["providers"]
 
 
 def test_load_registry_by_project_id_filters_dead_panes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -105,7 +105,7 @@ def test_load_registry_by_project_id_filters_dead_panes(tmp_path: Path, monkeypa
         },
     )
 
-    monkeypatch.setattr(pane_registry, "get_backend_for_session", lambda _rec: _FakeBackend(alive={"%alive"}))
+    monkeypatch.setattr(session_registry, "get_backend_for_session", lambda _rec: _FakeBackend(alive={"%alive"}))
     rec = load_registry_by_project_id(pid, "codex")
     assert rec is not None
     assert rec.get("ccb_session_id") == "old"
@@ -114,7 +114,7 @@ def test_load_registry_by_project_id_filters_dead_panes(tmp_path: Path, monkeypa
 def test_load_registry_by_project_id_infers_missing_project_id(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("USERPROFILE", str(tmp_path))
-    monkeypatch.setattr(pane_registry, "get_backend_for_session", lambda _rec: _FakeBackend(alive={"%1"}))
+    monkeypatch.setattr(session_registry, "get_backend_for_session", lambda _rec: _FakeBackend(alive={"%1"}))
 
     work_dir = tmp_path / "proj"
     work_dir.mkdir()

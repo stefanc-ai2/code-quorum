@@ -7,7 +7,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-from pane_registry import load_registry_by_claude_pane, load_registry_by_project_id, load_registry_by_session_id
+from session_registry import (
+    load_registry_by_claude_pane,
+    load_registry_by_project_id,
+    load_registry_by_project_id_unfiltered,
+    load_registry_by_session_id,
+)
 from project_id import compute_ccb_project_id
 from session_utils import find_project_session_file, project_config_dir
 
@@ -122,25 +127,6 @@ def _candidate_default_session_file(work_dir: Path) -> Optional[Path]:
     return cfg / ".claude-session"
 
 
-def _registry_run_dir() -> Path:
-    return Path.home() / ".ccb" / "run"
-
-
-def _registry_updated_at(data: dict, path: Path) -> int:
-    value = data.get("updated_at")
-    if isinstance(value, (int, float)):
-        return int(value)
-    if isinstance(value, str) and value.strip().isdigit():
-        try:
-            return int(value.strip())
-        except Exception:
-            pass
-    try:
-        return int(path.stat().st_mtime)
-    except Exception:
-        return 0
-
-
 def _project_key_for_path(path: Path) -> str:
     return re.sub(r"[^A-Za-z0-9]", "-", str(path))
 
@@ -206,38 +192,6 @@ def _normalize_session_binding(data: dict, work_dir: Path) -> None:
         candidate = _session_path_from_id(sid, work_dir)
         if candidate and candidate.exists():
             data["claude_session_path"] = str(candidate)
-
-
-def _load_registry_by_project_id_unfiltered(ccb_project_id: str, work_dir: Path) -> Optional[dict]:
-    if not ccb_project_id:
-        return None
-    run_dir = _registry_run_dir()
-    if not run_dir.exists():
-        return None
-    best: Optional[dict] = None
-    best_ts = -1
-    for path in sorted(run_dir.glob("ccb-session-*.json")):
-        try:
-            data = _read_json(path)
-        except Exception:
-            continue
-        if not data:
-            continue
-        pid = str(data.get("ccb_project_id") or "").strip()
-        if not pid:
-            wd = str(data.get("work_dir") or "").strip()
-            if wd:
-                try:
-                    pid = compute_ccb_project_id(Path(wd))
-                except Exception:
-                    pid = ""
-        if pid != ccb_project_id:
-            continue
-        ts = _registry_updated_at(data, path)
-        if ts > best_ts:
-            best_ts = ts
-            best = data
-    return best
 
 
 def resolve_claude_session(work_dir: Path) -> Optional[ClaudeSessionResolution]:
@@ -312,7 +266,7 @@ def resolve_claude_session(work_dir: Path) -> Optional[ClaudeSessionResolution]:
                 return resolved
 
         # Fallback: accept latest registry record even if pane liveness can't be verified.
-        unfiltered = _load_registry_by_project_id_unfiltered(pid, work_dir)
+        unfiltered = load_registry_by_project_id_unfiltered(pid, "claude")
         if isinstance(unfiltered, dict):
             data = _data_from_registry(unfiltered, work_dir)
             session_file = _session_file_from_record(unfiltered) or find_project_session_file(work_dir, ".claude-session")

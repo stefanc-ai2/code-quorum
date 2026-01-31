@@ -30,7 +30,7 @@ from compat import setup_windows_encoding
 from ccb_config import get_backend_env
 from ccb_start_config import DEFAULT_PROVIDERS, ensure_default_start_config, load_start_config
 from session_utils import safe_write_session, check_session_writable, find_project_session_file
-from pane_registry import upsert_registry
+from session_registry import upsert_registry
 from project_id import compute_ccb_project_id
 from process_lock import ProviderLock
 from messages import t

@@ -41,7 +41,7 @@ TERM=xterm-256color python -m pytest test/ -v --tb=short
 - `lib/terminal.py`: terminal backend abstraction (`TmuxBackend`, `WeztermBackend`)
 - `lib/*_session.py`: loads per-project session bindings and ensures pane liveness
 - `lib/ccb_protocol.py`: protocol markers (`CCB_REQ_ID`, `CCB_REPLY`, `CCB_FROM`, `CCB_DONE`) + wrapping helpers
-- `lib/project_id.py`, `lib/session_utils.py`, `lib/pane_registry.py`: project isolation and session lookup
+- `lib/project_id.py`, `lib/session_utils.py`, `lib/session_registry.py`: project isolation and session lookup
 
 ### Session isolation
 
@@ -52,4 +52,3 @@ This enables running multiple repositories (repo A and repo B) without cross-tal
 
 This repo tracks issues using Beads (`bd`) in `.beads/`.
 Prefer `bd` commands over manual edits to `.beads/issues.jsonl`.
-

@@ -5,7 +5,7 @@ import os
 import sys
 import time
 from pathlib import Path
-from typing import Optional, Dict, Any, Iterable
+from typing import Any, Dict, Iterable, Optional
 
 from cli_output import atomic_write_text
 from project_id import compute_ccb_project_id
@@ -94,24 +94,6 @@ def _provider_entry_from_legacy(data: Dict[str, Any], provider: str) -> Dict[str
             v = data.get(k_src)
             if v:
                 out[k_dst] = v
-    elif provider == "gemini":
-        for k_src, k_dst in [
-            ("gemini_pane_id", "pane_id"),
-            ("pane_title_marker", "pane_title_marker"),
-            ("gemini_session_id", "gemini_session_id"),
-            ("gemini_session_path", "gemini_session_path"),
-        ]:
-            v = data.get(k_src)
-            if v:
-                out[k_dst] = v
-    elif provider == "opencode":
-        for k_src, k_dst in [
-            ("opencode_pane_id", "pane_id"),
-            ("pane_title_marker", "pane_title_marker"),
-        ]:
-            v = data.get(k_src)
-            if v:
-                out[k_dst] = v
     elif provider == "claude":
         v = data.get("claude_pane_id")
         if v:
@@ -131,7 +113,7 @@ def _get_providers_map(data: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
 
     # Legacy flat format: derive providers on demand (no persistence here).
     out = {}
-    for p in ("codex", "gemini", "opencode", "claude"):
+    for p in ("codex", "claude"):
         entry = _provider_entry_from_legacy(data, p)
         if entry:
             out[p] = entry
@@ -274,6 +256,51 @@ def load_registry_by_project_id(ccb_project_id: str, provider: str) -> Optional[
     return best
 
 
+def load_registry_by_project_id_unfiltered(ccb_project_id: str, provider: str) -> Optional[Dict[str, Any]]:
+    """
+    Load the newest registry record matching `{ccb_project_id, provider}` without requiring pane liveness.
+
+    Useful as a fallback when the registry is present but the pane has been closed/restarted.
+    """
+    proj = (ccb_project_id or "").strip()
+    prov = (provider or "").strip().lower()
+    if not proj or not prov:
+        return None
+
+    best: Optional[Dict[str, Any]] = None
+    best_ts = -1
+
+    for path in _iter_registry_files():
+        data = _load_registry_file(path)
+        if not data:
+            continue
+        updated_at = _coerce_updated_at(data.get("updated_at"), path)
+        if _is_stale(updated_at):
+            continue
+
+        existing = (data.get("ccb_project_id") or "").strip()
+        inferred = ""
+        if not existing:
+            wd = (data.get("work_dir") or "").strip()
+            if wd:
+                try:
+                    inferred = compute_ccb_project_id(Path(wd))
+                except Exception:
+                    inferred = ""
+        effective = existing or inferred
+        if effective != proj:
+            continue
+
+        if prov not in _get_providers_map(data):
+            continue
+
+        if updated_at > best_ts:
+            best = data
+            best_ts = updated_at
+
+    return best
+
+
 def upsert_registry(record: Dict[str, Any]) -> bool:
     session_id = record.get("ccb_session_id")
     if not session_id:
@@ -319,11 +346,16 @@ def upsert_registry(record: Dict[str, Any]) -> bool:
             if k in {"provider", "providers"}:
                 continue
             # Provider-scoped keys should be passed in nested form by new code.
-            if k in {"pane_id", "pane_title_marker"} or k.endswith("_session_id") or k.endswith("_session_path") or k.endswith("_project_id"):
+            if (
+                k in {"pane_id", "pane_title_marker"}
+                or k.endswith("_session_id")
+                or k.endswith("_session_path")
+                or k.endswith("_project_id")
+            ):
                 providers[p][k] = v
 
     # Migrate legacy flat fields into providers.
-    for p in ("codex", "gemini", "opencode", "claude"):
+    for p in ("codex", "claude"):
         legacy_entry = _provider_entry_from_legacy(record, p)
         if legacy_entry:
             providers.setdefault(p, {})
@@ -361,3 +393,4 @@ def upsert_registry(record: Dict[str, Any]) -> bool:
     except Exception as exc:
         _debug(f"Failed to write registry {path}: {exc}")
         return False
+
