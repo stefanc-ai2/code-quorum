@@ -39,7 +39,7 @@ New architecture decision: `ask` sends directly to the target tmux/WezTerm pane 
 
 Epic: `claude_code_bridge-s7t` - Simplify CCB to Claude+Codex Only
 
-Note: Beads are the canonical work tracker. This markdown file is a high-level design/roadmap; treat details here as advisory.
+Note: Beads are the canonical work tracker. This markdown file is kept for narrative context and may become stale; treat details here as non-authoritative.
 
 ### Dependency Graph
 
