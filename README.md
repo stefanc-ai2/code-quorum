@@ -17,18 +17,7 @@
 [![CI](https://github.com/bfly123/claude_code_bridge/actions/workflows/test.yml/badge.svg)](https://github.com/bfly123/claude_code_bridge/actions/workflows/test.yml)
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg)]()
 
-**English** | [Chinese](README_zh.md)
-
-![Showcase](assets/show.png)
-
-<details>
-<summary><b>Demo animations</b></summary>
-
-<img src="assets/readme_previews/video2.gif" alt="Any-terminal collaboration demo" width="900">
-
-<img src="assets/readme_previews/video1.gif" alt="VS Code integration demo" width="900">
-
-</details>
+**English**
 
 </div>
 
@@ -571,8 +560,6 @@ Optional:
 
 ## 🖥️ Editor Integration: Neovim + Multi-AI Review
 
-<img src="assets/nvim.png" alt="Neovim integration with multi-AI code review" width="900">
-
 > Combine with editors like **Neovim** for seamless code editing and multi-model review workflow. Edit in your favorite editor while AI assistants review and suggest improvements in real-time.
 
 ---
@@ -606,8 +593,6 @@ ccb reinstall
 
 📧 Email: bfly123@126.com
 💬 WeChat: seemseam-com
-
-<img src="assets/weixin.png" alt="WeChat Group" width="300">
 
 </div>
 
@@ -739,7 +724,7 @@ ccb reinstall
 - Simplify cping.md to match oping/gping style (~65% token reduction)
 
 ### v2.3.2
-- Optimize skill files: extract common patterns to docs/async-ask-pattern.md (~60% token reduction)
+- Optimize skill files: extract common patterns (~60% token reduction)
 
 ### v2.3.1
 - Fix race condition in gask/cask: pre-check for existing messages before wait loop

@@ -1092,7 +1092,7 @@ def create_auto_layout(
     """
     Create tmux split layout for 1–4 providers, returning a provider->pane_id mapping.
 
-    Layout rules (matches docs/tmux-refactor-plan.md):
+    Layout rules:
     - 1 AI: no split
     - 2 AI: left/right
     - 3 AI: left 1 + right top/bottom 2
