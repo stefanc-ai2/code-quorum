@@ -33,6 +33,7 @@ LEGACY_SCRIPTS=(
   claude_ai
   claude_bridge
   # Removed provider-specific CLIs (kept for uninstall/upgrade cleanup)
+  ccb-ping
   cping
   lping
   cask

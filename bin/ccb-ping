@@ -1,6 +1,0 @@
-#!/usr/bin/env bash
-# ccb-ping - Wrapper for ping command to avoid Windows PING.EXE conflict
-# Usage: ccb-ping <provider>
-
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-exec "$SCRIPT_DIR/ping" "$@"
