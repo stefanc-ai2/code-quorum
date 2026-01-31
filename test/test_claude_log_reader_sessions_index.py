@@ -55,7 +55,7 @@ def test_latest_session_falls_back_to_scan_when_sessions_index_is_stale(tmp_path
         encoding="utf-8",
     )
 
-    # Simulate callers (lpend / askd) setting a preferred session from registry.
+    # Simulate callers setting a preferred session from registry.
     reader.set_preferred_session(old_session)
 
     assert reader.latest_message() == "new"
@@ -175,4 +175,3 @@ def test_scan_prefers_project_dir_over_preferred_dir(tmp_path) -> None:
 
     # Should still return from project_dir (not cross-repo bleed)
     assert reader.latest_message() == "from project dir"
-
