@@ -1734,7 +1734,7 @@ class AILauncher:
         }
         ok = upsert_registry(record)
         if not ok:
-            print("⚠️ Failed to update cpend registry", file=sys.stderr)
+            print("⚠️ Failed to update CCB registry", file=sys.stderr)
         return ok
 
     def _sync_cend_registry(self) -> None:
@@ -1911,7 +1911,7 @@ class AILauncher:
         print()
         print("🎯 Available commands:")
         if "codex" in self.providers:
-            print("   cask/cping/cpend - Codex communication")
+            print("   cask/cping - Codex communication")
         print()
         print(f"Executing: {' '.join(cmd)}")
 

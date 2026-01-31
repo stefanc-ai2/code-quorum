@@ -84,7 +84,6 @@
 |--------|-----------|
 | `cask`, `gask`, `oask`, `dask`, `lask` | `ask <provider> <message>` |
 | `cping`, `gping`, `oping`, `dping`, `lping` | `ping <provider>` |
-| `cpend`, `gpend`, `opend`, `dpend`, `lpend` | `pend <provider> [N]` |
 
 **支持的 provider:** `gemini`, `codex`, `opencode`, `droid`, `claude`
 
@@ -97,7 +96,6 @@
 **📦 新技能：**
 - `/ask <provider> <message>` - 请求 AI provider（默认后台）
 - `/ping <provider>` - 测试 provider 连通性
-- `/pend <provider> [N]` - 查看最新回复
 
 详见 [CHANGELOG.md](CHANGELOG.md)。
 
@@ -331,7 +329,7 @@ ccb reinstall           # 清理后重新安装
 <details>
 <summary><b>🪟 Windows 安装指南（WSL vs 原生）</b></summary>
 
-> 结论先说：`ccb/cask/cping/cpend` 必须和 `codex/gemini` 跑在**同一个环境**（WSL 就都在 WSL，原生 Windows 就都在原生 Windows）。最常见问题就是装错环境导致 `cping` 不通。
+> 结论先说：`ccb/ask/ping` 必须和 provider CLI 跑在**同一个环境**（WSL 就都在 WSL，原生 Windows 就都在原生 Windows）。最常见问题就是装错环境导致 `ping` 不通。
 
 补充：安装脚本会为 Claude/Codex 的 skills 自动安装对应平台的 `SKILL.md` 版本：
 - Linux/macOS/WSL：bash heredoc 模板（`SKILL.md.bash`）
@@ -381,7 +379,7 @@ cd claude_code_bridge
 ```
 
 提示：
-- 后续所有 `ccb/cask/cping/cpend` 也都请在 **WSL** 里运行（和你的 `codex/gemini` 保持一致）。
+- 后续所有 `ccb/ask/ping` 也都请在 **WSL** 里运行（和你的 provider CLI 保持一致）。
 
 #### 3.3 安装后如何测试（`cping`）
 
@@ -498,39 +496,24 @@ echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zprofile
 ### 旧命令（已废弃）
 - `cask/gask/oask/dask/lask` - 各 provider 独立的 ask 命令
 - `cping/gping/oping/dping/lping` - 各 provider 独立的 ping 命令  
-- `cpend/gpend/opend/dpend/lpend` - 各 provider 独立的 pend 命令
 
 ### 新统一命令
-- **`ask <provider> <message>`** - 统一请求命令（默认后台）
-  - 支持 provider: `gemini`, `codex`, `opencode`, `droid`, `claude`
-  - 默认后台；在 Codex 托管环境优先前台执行以避免后台被清理
-  - 可用 `--foreground` / `--background` 或 `CCB_ASK_FOREGROUND=1` / `CCB_ASK_BACKGROUND=1` 覆盖
-  - 前台执行使用同步发送，默认关闭 completion hook（除非设置 `CCB_COMPLETION_HOOK_ENABLED`）
-  - 支持 `--notify` 用于短消息同步通知
-  - 支持 `CCB_CALLER` 指定发起者（Codex 环境默认 codex，其它默认 claude）
+- **`ask <provider> <message>`** - 统一请求命令（只发送，始终异步）
+  - 支持 provider: `codex`, `claude`
+  - 会输出一个 `req_id` 并立即退出
+  - 结果通过 `ask --reply-to <req_id> --no-wrap ...` 回传到调用方窗格
 
 - **`ping <provider>`** - 统一的连通性测试命令
-  - 测试指定 provider 的 daemon 是否在线
-
-- **`pend <provider> [N]`** - 统一的查看回复命令
-  - 查看指定 provider 的最新回复
-  - 可选参数 N 指定查看最近 N 条
+  - 测试指定 provider 是否在线
 
 ### 技能系统 (Skills)
-- `/ask <provider> <message>` - 请求技能（默认后台；Codex 托管环境前台）
+- `/ask <provider> <message>` - 请求技能（只发送；通过 `ask --reply-to` 回传结果）
 - `/ping <provider>` - 连通性测试技能
-- `/pend <provider>` - 查看回复技能
 
 ### 跨平台支持
 - **Linux/macOS/WSL**: 使用 `tmux` 作为终端后端
 - **Windows WezTerm**: 使用 **PowerShell** 作为终端后端
 - **Windows PowerShell**: 原生支持，使用 DETACHED_PROCESS 后台执行
-
-### Completion Hook
-- 任务完成后自动通知发起者
-- 支持 `CCB_CALLER` 指定回调目标 (claude/codex/droid)
-- 支持 tmux 和 WezTerm 两种终端后端
- - 前台 ask 默认关闭 hook，除非设置 `CCB_COMPLETION_HOOK_ENABLED`
 
 ---
 
@@ -574,7 +557,7 @@ ccb reinstall
 - **守护进程**：全新的稳定守护进程设计
 
 ### v5.0.1
-- **技能更新**：新增 `/all-plan`（Superpowers 头脑风暴 + 可用性分发）；Codex 侧新增 `lping/lpend`；`gask` 在 `CCB_DONE` 场景保留简要执行摘要。
+- **技能更新**：新增 `/all-plan`（Superpowers 头脑风暴 + 可用性分发）；Codex 侧新增 `lping`；`gask` 在 `CCB_DONE` 场景保留简要执行摘要。
 - **CCA 状态栏**：从 `.autoflow/roles.json` 读取角色名（支持 `_meta.name`），并按路径缓存。
 - **安装器**：安装技能时复制子目录（如 `references/`）。
 - **CLI**：新增 `ccb uninstall` / `ccb reinstall`，并清理 Claude 配置。

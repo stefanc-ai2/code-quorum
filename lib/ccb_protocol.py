@@ -30,7 +30,7 @@ def strip_trailing_markers(text: str) -> str:
     """
     Remove trailing protocol/harness marker lines (blank lines, `CCB_DONE: <id>`, and other `*_DONE` tags).
 
-    This is meant for "recall"/display commands (e.g. `cpend`) where we want a clean view of the reply.
+    This is meant for "recall"/display commands where we want a clean view of the reply.
     """
     lines = [ln.rstrip("\n") for ln in (text or "").splitlines()]
     while lines:

@@ -4,7 +4,7 @@
 
 - `ccb`: primary CLI entrypoint (launcher/orchestrator).
 - `lib/`: Python implementation (terminal backends, daemons, provider comms, config/session utilities).
-- `bin/`: small CLI tools and wrappers (e.g. `ask`, `ping`, `pend`, `ccb-mounted`).
+- `bin/`: small CLI tools and wrappers (e.g. `ask`, `ping`, `ccb-mounted`).
 - `test/`: `pytest` suite (+ a few `test/system_*.sh` scripts).
 - `assets/`, `docs/`: documentation assets and Markdown docs.
 - `*_skills/`: provider-specific skill bundles installed by `install.sh`.

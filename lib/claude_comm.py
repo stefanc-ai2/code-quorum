@@ -846,7 +846,6 @@ class ClaudeCommunicator:
                 raise RuntimeError(f"❌ Session error: {status}")
             self._send_via_terminal(question)
             print("✅ Sent to Claude")
-            print("Hint: Use lpend to view reply")
             return True
         except Exception as exc:
             print(f"❌ Send failed: {exc}")

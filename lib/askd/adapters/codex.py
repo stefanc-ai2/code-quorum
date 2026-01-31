@@ -15,7 +15,6 @@ from askd_runtime import log_path, write_log
 from ccb_protocol import REQ_ID_PREFIX, is_done_text, strip_done_text, wrap_codex_prompt
 from caskd_session import CodexProjectSession, compute_session_key, load_project_session
 from codex_comm import CodexLogReader
-from completion_hook import notify_completion
 from providers import CASKD_SPEC
 from terminal import get_backend_for_session, is_windows
 
@@ -219,16 +218,6 @@ class CodexAdapter(BaseProviderAdapter):
         _write_log(
             f"[INFO] done provider=codex req_id={task.req_id} exit={result.exit_code} "
             f"anchor={result.anchor_seen} done={result.done_seen}"
-        )
-
-        notify_completion(
-            provider="codex",
-            output_file=req.output_path,
-            reply=reply,
-            req_id=task.req_id,
-            done_seen=done_seen,
-            caller=req.caller,
-            work_dir=req.work_dir,
         )
 
         return result

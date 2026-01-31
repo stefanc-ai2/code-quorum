@@ -59,8 +59,8 @@ msg() {
       en_msg="Detected WSL environment"
       zh_msg="检测到 WSL 环境" ;;
     same_env_required)
-      en_msg="ccb/ask/ping/pend must run in the same environment as codex/gemini."
-      zh_msg="ccb/ask/ping/pend 必须与 codex/gemini 在同一环境运行。" ;;
+      en_msg="ccb/ask/ping must run in the same environment as codex/gemini."
+      zh_msg="ccb/ask/ping 必须与 codex/gemini 在同一环境运行。" ;;
     confirm_wsl_native)
       en_msg="Please confirm: you will install and run codex/gemini in WSL (not Windows native)."
       zh_msg="请确认：你将在 WSL 中安装并运行 codex/gemini（不是 Windows 原生）。" ;;
@@ -89,21 +89,17 @@ fi
 
 SCRIPTS_TO_LINK=(
   bin/cask
-  bin/cpend
   bin/cping
   bin/lask
-  bin/lpend
   bin/lping
   bin/ask
   bin/ping
-  bin/pend
   bin/autonew
-  bin/ccb-completion-hook
   ccb
 )
 
 CLAUDE_MARKDOWN=(
-  # Old CCB commands removed - replaced by unified ask/ping/pend skills
+  # Old CCB commands removed - replaced by unified ask/ping skills
 )
 
 LEGACY_SCRIPTS=(
@@ -116,6 +112,10 @@ LEGACY_SCRIPTS=(
   claude_codex
   claude_ai
   claude_bridge
+  pend
+  cpend
+  lpend
+  ccb-completion-hook
   caskd
   gaskd
   oaskd
@@ -273,7 +273,7 @@ confirm_backend_env_wsl() {
   echo "================================================================"
   echo "WARN: Detected WSL environment"
   echo "================================================================"
-  echo "ccb/ask/ping/pend must run in the same environment as codex/gemini."
+  echo "ccb/ask/ping must run in the same environment as codex/gemini."
   echo
   echo "Please confirm: you will install and run codex/gemini in WSL (not Windows native)."
   echo "================================================================"
@@ -571,7 +571,7 @@ install_claude_commands() {
   claude_dir="$(detect_claude_dir)"
   mkdir -p "$claude_dir"
 
-  # Clean up obsolete CCB commands (replaced by unified ask/ping/pend)
+  # Clean up obsolete CCB commands (replaced by unified ask/ping)
   local obsolete_cmds="cask.md gask.md oask.md dask.md lask.md cpend.md gpend.md opend.md dpend.md lpend.md cping.md gping.md oping.md dping.md lping.md"
   for obs_cmd in $obsolete_cmds; do
     if [[ -f "$claude_dir/$obs_cmd" ]]; then
@@ -598,8 +598,8 @@ install_claude_skills() {
 
   mkdir -p "$skills_dst"
 
-  # Clean up obsolete CCB skills (replaced by unified ask/ping/pend)
-  local obsolete_skills="cask gask oask dask lask cpend gpend opend dpend lpend cping gping oping dping lping"
+  # Clean up obsolete CCB skills (replaced by unified ask/ping)
+  local obsolete_skills="pend cask gask oask dask lask cpend gpend opend dpend lpend cping gping oping dping lping"
   for obs_skill in $obsolete_skills; do
     if [[ -d "$skills_dst/$obs_skill" ]]; then
       rm -rf "$skills_dst/$obs_skill"
@@ -667,8 +667,8 @@ install_codex_skills() {
 
   mkdir -p "$skills_dst"
 
-  # Clean up obsolete CCB skills (replaced by unified ask/ping/pend)
-  local obsolete_skills="cask gask oask dask lask cpend gpend opend dpend lpend cping gping oping dping lping"
+  # Clean up obsolete CCB skills (replaced by unified ask/ping)
+  local obsolete_skills="pend cask gask oask dask lask cpend gpend opend dpend lpend cping gping oping dping lping"
   for obs_skill in $obsolete_skills; do
     if [[ -d "$skills_dst/$obs_skill" ]]; then
       rm -rf "$skills_dst/$obs_skill"
@@ -732,8 +732,8 @@ install_droid_skills() {
 
   mkdir -p "$skills_dst"
 
-  # Clean up obsolete CCB skills (replaced by unified ask/ping/pend)
-  local obsolete_skills="cask gask oask dask lask cpend gpend opend dpend lpend cping gping oping dping lping"
+  # Clean up obsolete CCB skills (replaced by unified ask/ping)
+  local obsolete_skills="pend cask gask oask dask lask cpend gpend opend dpend lpend cping gping oping dping lping"
   for obs_skill in $obsolete_skills; do
     if [[ -d "$skills_dst/$obs_skill" ]]; then
       rm -rf "$skills_dst/$obs_skill"
@@ -791,11 +791,11 @@ install_claude_md_config() {
   cat > "$ccb_tmpfile" << 'AI_RULES'
 <!-- CCB_CONFIG_START -->
 ## AI Collaboration
-Use `/ask <provider>` to consult other AI assistants (codex/gemini/opencode/droid).
+Use `/ask <provider>` to consult other AI assistants (codex/claude).
 Use `/ping <provider>` to check connectivity.
-Use `/pend <provider>` to view latest replies.
+Responses arrive in-pane via reply-via-ask.
 
-Providers: `codex`, `gemini`, `opencode`, `droid`, `claude`
+Providers: `codex`, `claude`
 <!-- CCB_CONFIG_END -->
 AI_RULES
   local ccb_content
@@ -856,17 +856,15 @@ install_settings_permissions() {
   local perms_to_add=(
     'Bash(ask *)'
     'Bash(ping *)'
-    'Bash(pend *)'
   )
 
   if [[ ! -f "$settings_file" ]]; then
     cat > "$settings_file" << 'SETTINGS'
 {
-	  "permissions": {
+	      "permissions": {
 	    "allow": [
 	      "Bash(ask *)",
-	      "Bash(ping *)",
-	      "Bash(pend *)"
+	      "Bash(ping *)"
 	    ],
     "deny": []
   }

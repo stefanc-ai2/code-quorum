@@ -887,7 +887,6 @@ class CodexCommunicator:
             log_hint = state.get("log_path") or self.log_reader.current_log_path()
             self._remember_codex_session(log_hint)
             print(f"✅ Sent to Codex (marker: {marker[:12]}...)")
-            print("Tip: Use /cpend to view latest reply")
             return True
         except Exception as exc:
             print(f"❌ Send failed: {exc}")
@@ -1110,7 +1109,7 @@ class CodexCommunicator:
                 }
             )
             if not ok:
-                print("⚠️  Failed to update cpend registry", file=sys.stderr)
+                print("⚠️  Failed to update CCB registry", file=sys.stderr)
 
         self.session_info["codex_session_path"] = path_str
         if session_id:

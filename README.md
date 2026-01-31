@@ -53,7 +53,6 @@
 <summary><b>v5.1.2</b> - Daemon & Hooks Reliability</summary>
 
 **🔧 Fixes & Improvements:**
-- **Claude Completion Hook**: Unified askd now triggers completion hook for Claude
 - **askd Lifecycle**: askd is bound to CCB lifecycle to avoid stale daemons
 - **Mounted Detection**: `ccb-mounted` uses ping-based detection across all platforms
 - **State File Lookup**: `askd_client` falls back to `CCB_RUN_DIR` for daemon state files
@@ -83,7 +82,6 @@ See [CHANGELOG.md](CHANGELOG.md) for full details.
 |--------------|---------------------|
 | `cask`, `gask`, `oask`, `dask`, `lask` | `ask <provider> <message>` |
 | `cping`, `gping`, `oping`, `dping`, `lping` | `ping <provider>` |
-| `cpend`, `gpend`, `opend`, `dpend`, `lpend` | `pend <provider> [N]` |
 
 **Supported providers:** `gemini`, `codex`, `opencode`, `droid`, `claude`
 
@@ -96,7 +94,6 @@ See [CHANGELOG.md](CHANGELOG.md) for full details.
 **📦 New Skills:**
 - `/ask <provider> <message>` - Request to AI provider (background by default)
 - `/ping <provider>` - Test provider connectivity
-- `/pend <provider> [N]` - View latest provider reply
 
 See [CHANGELOG.md](CHANGELOG.md) for full details.
 
@@ -107,7 +104,7 @@ See [CHANGELOG.md](CHANGELOG.md) for full details.
 
 - **Zombie Cleanup**: `ccb kill -f` now cleans up orphaned tmux sessions globally (sessions whose parent process has exited)
 - **Mounted Skill**: Optimized to use `pgrep` for daemon detection (~4x faster), extracted to standalone `ccb-mounted` script
-- **Droid Skills**: Added full skill set (cask/gask/lask/oask + ping/pend variants) to `droid_skills/`
+- **Droid Skills**: Added full skill set (cask/gask/lask/oask + ping variants) to `droid_skills/`
 - **Install**: Added `install_droid_skills()` to install Droid skills to `~/.droid/skills/`
 
 </details>
@@ -356,7 +353,7 @@ ccb reinstall           # Clean then reinstall ccb
 <details>
 <summary><b>🪟 Windows Installation Guide (WSL vs Native)</b></summary>
 
-> **Key Point:** `ccb/cask/cping/cpend` must run in the **same environment** as `codex/gemini`. The most common issue is environment mismatch causing `cping` to fail.
+> **Key Point:** `ccb/ask/ping` must run in the **same environment** as the provider CLIs. The most common issue is environment mismatch causing `ping` to fail.
 
 Note: The installers also install OS-specific `SKILL.md` variants for Claude/Codex skills:
 - Linux/macOS/WSL: bash heredoc templates (`SKILL.md.bash`)
@@ -475,39 +472,24 @@ Once started, collaborate naturally. Claude will detect when to delegate tasks.
 ### Legacy Commands (Deprecated)
 - `cask/gask/oask/dask/lask` - Independent ask commands per provider
 - `cping/gping/oping/dping/lping` - Independent ping commands  
-- `cpend/gpend/opend/dpend/lpend` - Independent pend commands
 
 ### Unified Commands
-- **`ask <provider> <message>`** - Unified request (background by default)
-  - Supports: `gemini`, `codex`, `opencode`, `droid`, `claude`
-  - Defaults to background; managed Codex sessions prefer foreground to avoid cleanup
-  - Override with `--foreground` / `--background` or `CCB_ASK_FOREGROUND=1` / `CCB_ASK_BACKGROUND=1`
-  - Foreground uses sync send and disables completion hook unless `CCB_COMPLETION_HOOK_ENABLED` is set
-  - Supports `--notify` for short synchronous notifications
-  - Supports `CCB_CALLER` (default: `codex` in Codex sessions, otherwise `claude`)
+- **`ask <provider> <message>`** - Unified request (send-only, always async)
+  - Supports: `codex`, `claude`
+  - Prints a `req_id` and exits immediately
+  - Results should be delivered back to the caller via `ask --reply-to <req_id> --no-wrap ...`
 
 - **`ping <provider>`** - Unified connectivity test
   - Checks if the specified provider's daemon is online
 
-- **`pend <provider> [N]`** - Unified reply fetch
-  - Fetches latest N replies from the provider
-  - Optional N specifies number of recent messages
-
 ### Skills System
-- `/ask <provider> <message>` - Request skill (background by default; foreground in managed Codex sessions)
+- `/ask <provider> <message>` - Request skill (send-only; replies via `ask --reply-to`)
 - `/ping <provider>` - Connectivity test skill
-- `/pend <provider>` - Reply fetch skill
 
 ### Cross-Platform Support
 - **Linux/macOS/WSL**: Uses `tmux` as terminal backend
 - **Windows WezTerm**: Uses **PowerShell** as terminal backend
 - **Windows PowerShell**: Native support via `DETACHED_PROCESS` background execution
-
-### Completion Hook
-- Notifies caller upon task completion
-- Supports `CCB_CALLER` targeting (`claude`/`codex`/`droid`)
-- Compatible with both tmux and WezTerm backends
- - Foreground ask suppresses the hook unless `CCB_COMPLETION_HOOK_ENABLED` is set
 
 ---
 
@@ -573,7 +555,7 @@ Example:
 How it works:
 1. **Plan** - Reuse existing plan (or create a compact one)
 2. **Implement** - Make the changes + run validations
-3. **Review** - Ask other mounted providers via `ask` + fetch via `pend`
+3. **Review** - Ask other mounted providers via `ask` + receive feedback via reply-via-ask
 4. **Merge** - Apply must-fix/should-fix feedback
 5. **Repeat** - One more implement→review→merge pass
 
@@ -649,7 +631,7 @@ ccb reinstall
 - **Daemons**: 全新的稳定守护进程设计
 
 ### v5.0.1
-- **Skills**: New `/all-plan` with Superpowers brainstorming + availability gating; Codex `lping/lpend` added; `gask` keeps brief summaries with `CCB_DONE`.
+- **Skills**: New `/all-plan` with Superpowers brainstorming + availability gating; Codex `lping` added; `gask` keeps brief summaries with `CCB_DONE`.
 - **CCA Status Bar**: CCA label now reads role name from `.autoflow/roles.json` (supports `_meta.name`) and caches per path.
 - **Installer**: Copy skill subdirectories (e.g., `references/`) for Claude/Codex installs.
 - **CLI**: Added `ccb uninstall` / `ccb reinstall` with Claude config cleanup.
@@ -697,11 +679,11 @@ ccb reinstall
 - **Simplified Auto Mode**: Removed CCA detection logic from `ccb -a`, now purely uses `--dangerously-skip-permissions`
 
 ### v4.0.6
-- **Session Overrides**: `cping/gping/oping/cpend/opend` support `--session-file` / `CCB_SESSION_FILE` to bypass wrong `cwd`
+- **Session Overrides**: `cping/gping/oping` support `--session-file` / `CCB_SESSION_FILE` to bypass wrong `cwd`
 
 ### v4.0.5
 - **Gemini Reliability**: Retry reading Gemini session JSON to avoid transient partial-write failures
-- **Claude Code Reliability**: `gpend` supports `--session-file` / `CCB_SESSION_FILE` to bypass wrong `cwd`
+- **Claude Code Reliability**: Session file overrides via `CCB_SESSION_FILE` to bypass wrong `cwd`
 
 ### v4.0.4
 - **Fix**: Auto-repair duplicate `[projects.\"...\"]` entries in `~/.codex/config.toml` before starting Codex

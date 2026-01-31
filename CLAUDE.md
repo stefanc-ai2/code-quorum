@@ -36,7 +36,6 @@ TERM=xterm-256color pytest test/ -v --tb=short
 - `ccb` - Main launcher that starts/manages terminal sessions and daemons
 - `bin/ask` - Unified async request handler (routes to any provider)
 - `bin/ping` - Connectivity test for providers
-- `bin/pend` - View latest provider responses
 
 ### Core Modules (lib/)
 
@@ -81,7 +80,6 @@ Located in `claude_skills/`, `codex_skills/`, `droid_skills/`. Each skill has:
 | `CCB_PARENT_PID` | Parent process tracking (daemon lifecycle) |
 | `CCB_UNIFIED_ASKD` | Use unified daemon (default: true) |
 | `CCB_CALLER` | Request caller identifier |
-| `CCB_COMPLETION_HOOK_ENABLED` | Trigger completion hook (default: true) |
 
 ## Testing Notes
 

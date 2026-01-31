@@ -106,7 +106,7 @@ Reply with:
 ```
 
 Then run `ask <provider>` (using the platform-appropriate invocation for your environment).
-Recommended: set `CCB_CALLER=claude` when invoking `ask` so completion hooks attribute correctly.
+Recommended: set `CCB_CALLER=claude` when invoking `ask` so reply payloads include the correct `CCB_FROM`.
 
 If you need a raw example for Linux/macOS/WSL:
 ```bash
