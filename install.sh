@@ -88,9 +88,7 @@ if [[ "${EUID:-$(id -u)}" -eq 0 ]]; then
 fi
 
 SCRIPTS_TO_LINK=(
-  bin/cask
   bin/cping
-  bin/lask
   bin/lping
   bin/ask
   bin/ping

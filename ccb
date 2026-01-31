@@ -1911,7 +1911,7 @@ class AILauncher:
         print()
         print("🎯 Available commands:")
         if "codex" in self.providers:
-            print("   cask/cping - Codex communication")
+            print("   ask codex / ping codex - Codex communication")
         print()
         print(f"Executing: {' '.join(cmd)}")
 
