@@ -24,6 +24,6 @@ Note: The driver always answers alongside respondents and includes that answer i
 
 Examples:
 - `/poll "Should we use Redis or Memcached for sessions?"`
-- `/poll "What could cause this race condition?" respondents=codex,opencode format=table`
+- `/poll "What could cause this race condition?" respondents=codex format=table`
 
 For the exact workflow and prompt templates, see `references/flow.md`.

@@ -19,16 +19,18 @@ Run:
 ccb-mounted
 ```
 
-If `ccb-mounted` fails (non-zero) or returns invalid output, stop and ask the user to fix mounting/daemons first.
-
-Parse `mounted[]` and define:
+If `ccb-mounted` succeeds and returns a `mounted[]` list, define:
 - For this skill, `{self} = claude`
 - `respondents = mounted - {self}`
 - If `respondents=...` is provided, use `respondents = (mounted ∩ requested_respondents) - {self}`
 
+If `ccb-mounted` fails (non-zero) or returns invalid/empty output:
+- If `respondents=...` is provided, use `respondents = requested_respondents - {self}`
+- Otherwise proceed solo
+
 If `respondents` is empty, proceed solo: answer the question yourself and clearly label it as a solo response.
 
-Generate a fresh correlation id you can match against later:
+Generate a fresh correlation id you can match against later. Use it as the `req_id` for all broadcast `ask` calls:
 - `POLL_ID = <timestamp + random>` (example: `2026-01-30T12:34:56Z-8f3a`)
 - `POLL_DRIVER = {self}` (the provider that invoked `/poll`)
 
@@ -46,7 +48,15 @@ Send one request per respondent.
 
 Template:
 ```
-You are responding to a multi-provider poll. Reply with feedback only — do not invoke `/poll`, `/pair`, or `/all-plan`, and do not implement changes.
+You are responding to a multi-provider poll. Provide an answer only — do not invoke `/poll`, `/pair`, or `/all-plan`, and do not implement changes.
+
+When you're done, send your answer back to the poll driver via reply-via-ask:
+1) Copy the `CCB_REQ_ID: <id>` line at the top of this message
+2) Run:
+   CCB_CALLER=<your provider> ask claude --reply-to <id> --no-wrap <<'EOF'
+   <your answer>
+   EOF
+Do not reply in your own pane; send your answer via `ask --reply-to` so it arrives in the driver's pane.
 
 POLL_ID:
 <paste id>
@@ -65,7 +75,7 @@ Reply with:
 
 Then run, once per respondent (sequentially; pause ~1s between providers):
 ```bash
-CCB_CALLER=claude ask <provider> --background <<'EOF'
+CCB_CALLER=claude CCB_REQ_ID="$POLL_ID" ask <provider> <<'EOF'
 <message>
 EOF
 ```
@@ -81,23 +91,18 @@ Use the same structure as the respondent template so your answer can be synthesi
 
 Notes:
 - On Windows native, avoid heredocs; use the `/ask` skill’s Windows instructions.
-  - PowerShell example: `$env:CCB_CALLER="claude"; Get-Content $msgFile -Raw | ask <provider> --background`
-  - cmd.exe example: `set CCB_CALLER=claude && type %MSG_FILE% | ask <provider> --background`
+  - PowerShell example: `$env:CCB_CALLER="claude"; $env:CCB_REQ_ID=$POLL_ID; Get-Content $msgFile -Raw | ask <provider>`
+  - cmd.exe example: `set CCB_CALLER=claude && set CCB_REQ_ID=%POLL_ID% && type %MSG_FILE% | ask <provider>`
 
-## Step 3: Collect answers (pend)
+## Step 3: Collect answers (reply-via-ask)
 
-Wait before the first `pend` so you don’t re-read stale output (recommended: **35s**).
+Respondents send answers back to your pane via `ask --reply-to ... --no-wrap`.
 
-For each respondent:
-```bash
-pend <provider>
-```
+Each reply payload should include:
+- `CCB_REPLY: <POLL_ID>`
+- `CCB_FROM: <provider>`
 
-Retry / staleness rules:
-- If `pend` says there is no reply yet: wait **10s**, retry once.
-- If the reply does **not** clearly contain your `POLL_ID`, treat it as stale: wait **15s**, retry once.
-- If still stale or missing after retry, proceed without that provider and note it in the output.
-- Cap total waiting per provider at `timeout_s` (default **60s**). Proceed with partial responses.
+Do not block on polling/sleeps. Continue working and incorporate answers as they arrive. If nothing arrives within `timeout_s`, proceed with partial responses and note which respondents did not reply.
 
 ## Step 4: Synthesize
 

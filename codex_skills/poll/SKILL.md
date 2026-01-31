@@ -24,6 +24,6 @@ Note: The driver always answers alongside respondents and includes that answer i
 
 Examples:
 - `/poll "Should we use Redis or Memcached for sessions?"`
-- `/poll "Is this API design idiomatic in Python?" respondents=claude,opencode format=list`
+- `/poll "Is this API design idiomatic in Python?" respondents=claude format=list`
 
 For the exact workflow and prompt templates, see `references/flow.md`.
