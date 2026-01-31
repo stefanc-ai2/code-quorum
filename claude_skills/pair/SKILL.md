@@ -22,4 +22,6 @@ Arguments (parsed from `$ARGUMENTS`):
 - Optional: `skip_plan=0|1` (default `0`)
 - Optional: `reviewers=<comma-separated providers>` (default: all mounted providers except the driver)
 
+Note: After requesting review feedback via `ask`, stop and wait for replies via reply-via-ask (don’t continue to merge until feedback arrives).
+
 For the exact workflow and review prompt templates, see `references/flow.md`.

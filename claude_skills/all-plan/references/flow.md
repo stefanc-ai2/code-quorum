@@ -233,7 +233,7 @@ Save as `design_brief`.
 
 ---
 
-### Phase 2: Parallel Independent Design
+### Phase 2: Parallel Design (Multi-Turn)
 
 Send the design brief to mounted CLIs (from `mounted_providers`) for independent design.
 
@@ -268,17 +268,14 @@ Be specific and concrete.
 EOF
 ```
 
-**2.4 Claude's Independent Design**
+**2.4 STOP (wait for responses)**
 
-While waiting for responses, create YOUR own design (do not look at others yet):
-- Goal (1 sentence)
-- Architecture approach
-- Implementation steps (3-7 key steps)
-- Technical considerations
-- Potential risks
-- Acceptance criteria (max 3)
+After dispatching planning requests: **stop immediately**.
 
-Save as `claude_design`.
+Rules:
+- Do not draft Claude’s design while waiting.
+- Do not run any additional commands (no `sleep`, no polling, no “quick commands”).
+- End your turn and wait for replies via reply-via-ask.
 
 ---
 
@@ -286,9 +283,10 @@ Save as `claude_design`.
 
 **3.1 Collect Response(s)**
 
-This flow is **multi-turn**. To get the reply, you don’t need to do anything special — don’t invoke `sleep`, polling loops, or any other waiting command. Codex will send a message back to your terminal (driver pane) via `ask claude --reply-to=<CODEX_PLAN_REQ_ID> ...`.
+This flow is **multi-turn**. To get the reply: end your turn and wait (do not run additional commands). Codex will send a message back to your terminal (driver pane) via `ask claude --reply-to=<CODEX_PLAN_REQ_ID> ...`.
 
 - When the reply arrives, save it as `codex_design`.
+- After you have the respondent designs, draft your own design as `claude_design`.
 - Do not scrape panes to collect replies (forbidden): no `wezterm cli get-text`, no `tmux capture-pane`, etc. The only supported mechanism is reply-via-ask.
 
 **3.2 Comparative Analysis**
@@ -402,7 +400,7 @@ EOF
 ```
 
 This is **multi-turn**:
-- Wait for Codex to reply via `ask claude --reply-to=<CODEX_REVIEW_1_REQ_ID> ...`.
+- Stop and wait (end your turn). Codex will reply via `ask claude --reply-to=<CODEX_REVIEW_1_REQ_ID> ...`.
 - When it arrives, save it as `codex_review_1`.
 
 **4.3 Discussion Round 2 - Resolve & Finalize**
@@ -435,7 +433,7 @@ EOF
 ```
 
 This is **multi-turn**:
-- Wait for Codex to reply via `ask claude --reply-to=<CODEX_REVIEW_2_REQ_ID> ...`.
+- Stop and wait (end your turn). Codex will reply via `ask claude --reply-to=<CODEX_REVIEW_2_REQ_ID> ...`.
 - When it arrives, save it as `codex_review_2`.
 
 ---
@@ -596,7 +594,7 @@ Next: Review the plan and proceed with implementation when ready.
 
 1. **Structured Clarification**: Use option-based questions to systematically capture requirements
 2. **Readiness Scoring**: Quantify requirement completeness before proceeding
-3. **True Independence**: All CLIs design independently without seeing others' work first
+3. **Stop-and-Wait**: Coordinator stops immediately after dispatching and resumes only when replies arrive via reply-via-ask
 4. **Diverse Perspectives**: Leverage unique strengths of each CLI
 5. **Evidence-Based Synthesis**: Merge based on comparative analysis, not arbitrary choices
 6. **Iterative Refinement**: Use Codex discussion to validate and improve merged design

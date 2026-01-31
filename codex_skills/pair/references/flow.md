@@ -117,6 +117,8 @@ Notes:
 - To avoid race conditions, send `ask` requests sequentially with a short pause (e.g. ~1s) between providers.
  - Reviewers should not run `/pair` recursively; they should only respond with critique.
 
+After sending review requests to all reviewers: **stop immediately**. Do not continue implementation or merging until feedback arrives via reply-via-ask.
+
 ## Step 4: Collect feedback (reply-via-ask)
 
 Reviewers will send feedback back to your pane via `ask --reply-to ... --caller <provider>`.
@@ -125,7 +127,7 @@ Each reply payload should include:
 - `CCB_REPLY: <req_id>` (the req_id from the original `ask`)
 - `CCB_FROM: <provider>`
 
-To get the feedback, you don’t need to do anything special — don’t invoke `sleep`, polling loops, or any other waiting command. Reviewers will send messages back to your terminal (driver pane) via `ask --reply-to`.
+This step is multi-turn. To get the feedback: end your turn and wait (do not run additional commands). Reviewers will send messages back to your terminal (driver pane) via `ask --reply-to`.
 Do not scrape panes to collect feedback (forbidden): no `wezterm cli get-text`, no `tmux capture-pane`, etc. The only supported mechanism is reply-via-ask.
 
 ## Step 5: Digest and merge

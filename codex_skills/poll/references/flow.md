@@ -1,7 +1,7 @@
 # Poll (Multi-Provider Q&A) - Flow
 
 This workflow simulates “ask the room”:
-- **You** = Driver (the provider that invoked `/poll`; broadcasts first, answers too, then synthesizes)
+- **You** = Driver (the provider that invoked `/poll`; answers first, then broadcasts, then waits for replies, then synthesizes)
 - **Other mounted providers** = Respondents (answer independently; no code changes)
 
 ## Inputs
@@ -9,7 +9,6 @@ This workflow simulates “ask the room”:
 From `$ARGUMENTS`:
 - `question`: the question to broadcast
 - Optional: `respondents=<comma-separated providers>` (default: all mounted except `{self}`)
-- Optional: `timeout_s=<seconds>` (default: `60`)
 - Optional: `format=consensus|list|table` (default: `consensus`)
 
 ## Step 0: Detect which providers can respond
@@ -40,6 +39,15 @@ Generate a fresh correlation id (32-hex) you can match against later. Use it as 
 If `question` is empty or missing, ask the user to provide a question before proceeding.
 
 If the question is ambiguous, ask the user 1-2 clarifying questions (option-based if possible) before broadcasting.
+
+## Step 1.5: Driver answer (pre-broadcast)
+
+Before broadcasting to respondents, write your own answer **independently** (don’t wait for anyone else):
+- Answer (2-8 sentences)
+- Confidence: high|medium|low
+- Key assumptions / caveats (bullets)
+
+Do not send your driver answer to respondents; broadcast only the question.
 
 ## Step 2: Broadcast question (ask)
 
@@ -86,14 +94,14 @@ ask <provider> --req-id "$POLL_ID" <<'EOF'
 EOF
 ```
 
-## Step 2.5: Driver answers (in parallel)
+## Step 2.5: STOP (wait for replies)
 
-After broadcasting to respondents, answer the question yourself **while they work**.
+After broadcasting to respondents: **stop immediately**.
 
-Use the same structure as the respondent template so your answer can be synthesized consistently:
-- Answer (2-8 sentences)
-- Confidence: high|medium|low
-- Key assumptions / caveats (bullets)
+Rules:
+- Do **not** write a second driver answer (or revise it).
+- Do **not** run any additional commands (no `sleep`, no “quick commands”, no polling).
+- End your turn and wait for respondents to reply via reply-via-ask.
 
 ## Step 3: Collect answers (reply-via-ask)
 
@@ -103,7 +111,7 @@ Each reply payload should include:
 - `CCB_REPLY: <POLL_ID>`
 - `CCB_FROM: <provider>`
 
-To get the reply, you don’t need to do anything special — don’t invoke `sleep`, polling loops, or any other waiting command. The respondent will send a message back to your terminal (driver pane) via `ask --reply-to`.
+To get replies: do nothing. End your turn and wait — respondents will send messages back to your terminal (driver pane) via `ask --reply-to`.
 
 Do not scrape panes to collect answers (forbidden): no `wezterm cli get-text`, no `tmux capture-pane`, etc. The only supported mechanism is reply-via-ask.
 
@@ -119,8 +127,8 @@ Synthesis heuristics:
 - If a majority agrees on the core answer, report as consensus.
 - If split, report vote counts and the main trade-off axes.
 - Prefer high-confidence answers when weighing ambiguous splits.
-- Include the driver answer when determining majority consensus (label it clearly as the driver).
-- Synthesize objectively even if the driver’s answer differs from the consensus.
+- Include the driver answer (written before broadcasting) when determining majority consensus (label it clearly as the driver).
+- Synthesize objectively even if your own intuition differs from the consensus.
 
 ## Output
 
@@ -135,10 +143,12 @@ Use the requested format (default: `consensus`).
 **Driver:** codex
 **Respondents asked:** <list>
 **Respondents replied:** <list>
-**Respondents timed out/stale:** <list or "none">
 
 ### Driver Answer
 <your answer> (confidence: <X>)
+
+### Respondent Responses
+- <provider>: <answer> (confidence: <X>)
 
 ### Consensus
 <synthesized answer (or “No clear consensus”)>
