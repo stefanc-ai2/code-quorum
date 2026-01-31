@@ -90,7 +90,7 @@ tmux set-option -t "$session" 'status-format[1]' "$status_format_1" >/dev/null 2
 status_format_0="#[align=left bg=#1e1e2e]#{T:status-left}#[align=centre fg=#6c7086]#{b:pane_current_path}#[align=right]#{T:status-right}"
 tmux set-option -t "$session" 'status-format[0]' "$status_format_0" >/dev/null 2>&1 || true
 
-# Mode-aware status-left: [MODE] > [git-branch] > [CCA]
+# Mode-aware status-left: [MODE] > [git-branch]
 accent='#{?client_prefix,#f38ba8,#{?pane_in_mode,#fab387,#f5c2e7}}'
 label='#{?client_prefix,KEY,#{?pane_in_mode,COPY,INPUT}}'
 git_info='-'
@@ -98,8 +98,7 @@ if [[ -x "$git_script" ]]; then
   # Cached to avoid blocking tmux (git can be slow in big repos).
   git_info="#(${git_script} \"#{pane_current_path}\")"
 fi
-cca_status="#(${status_script} cca \"#{pane_current_path}\")"
-tmux set-option -t "$session" status-left "#[fg=#1e1e2e,bg=${accent},bold] ${label} #[fg=${accent},bg=#cba6f7]#[fg=#1e1e2e,bg=#cba6f7] ${git_info} #[fg=#cba6f7,bg=#89b4fa]#[fg=#1e1e2e,bg=#89b4fa] CCA:${cca_status} #[fg=#89b4fa,bg=#1e1e2e]" >/dev/null 2>&1 || true
+tmux set-option -t "$session" status-left "#[fg=#1e1e2e,bg=${accent},bold] ${label} #[fg=${accent},bg=#cba6f7]#[fg=#1e1e2e,bg=#cba6f7] ${git_info} #[fg=#cba6f7,bg=#1e1e2e]" >/dev/null 2>&1 || true
 
 # Right: < Focus:AI < CCB:ver < ○○○○ < HH:MM
 ccb_version="$(ccb --print-version 2>/dev/null || true)"

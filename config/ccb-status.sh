@@ -56,131 +56,6 @@ check_session() {
     fi
 }
 
-cca_status_for_path() {
-    local work_dir="$1"
-    if [[ -z "$work_dir" || ! -d "$work_dir" ]]; then
-        echo "OFF"
-        return
-    fi
-
-    local autoflow_dir="$work_dir/.autoflow"
-    if [[ ! -d "$autoflow_dir" ]]; then
-        echo "OFF"
-        return
-    fi
-
-    local role=""
-    local cfg=""
-    for cfg in "$autoflow_dir/roles.session.json" "$autoflow_dir/roles.json"; do
-        if [[ -f "$cfg" ]]; then
-            local py
-            py="$(command -v python3 2>/dev/null || command -v python 2>/dev/null || true)"
-            if [[ -n "$py" ]]; then
-                role="$("$py" - "$cfg" <<'PY'
-import json,re,sys
-path = sys.argv[1]
-try:
-    with open(path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-except Exception:
-    data = {}
-providers = {
-    "claude","codex","opencode","gemini","droid","oc","cc","ge","dr",
-}
-DESCRIPTIVE_KEYS = (
-    "plan","scheme","role","role_type","roleType","roleset",
-    "type","profile","group","team","mode","name","roles",
-)
-PROVIDER_KEYS = (
-    "executor","reviewer","documenter","designer",
-    "searcher","web_searcher","repo_searcher","git_manager",
-)
-def _meta_name(obj):
-    meta = obj.get("_meta")
-    if isinstance(meta, dict):
-        return _normalize(meta.get("name"), allow_provider=True)
-    return ""
-def _is_providerish(value):
-    if not isinstance(value, str):
-        return False
-    val = value.strip()
-    if not val:
-        return False
-    tokens = re.findall(r"[a-z0-9_]+", val.lower())
-    return bool(tokens) and all(tok in providers for tok in tokens)
-def _normalize(val, allow_provider=False):
-    if isinstance(val, str):
-        val = val.strip()
-        if not val:
-            return ""
-        if not allow_provider and _is_providerish(val):
-            return ""
-        return val
-    if isinstance(val, (list, tuple)):
-        items = [v for v in (_normalize(v, allow_provider=allow_provider) for v in val) if v]
-        return ",".join(items)
-    if isinstance(val, dict):
-        keys = DESCRIPTIVE_KEYS + (PROVIDER_KEYS if allow_provider else ())
-        for key in keys:
-            if key in val:
-                out = _normalize(val.get(key), allow_provider=allow_provider)
-                if out:
-                    return out
-    return ""
-def _first_value(keys, allow_provider=False):
-    for key in keys:
-        out = _normalize(data.get(key), allow_provider=allow_provider)
-        if out:
-            return out
-    return ""
-out = _meta_name(data)
-if not out:
-    out = _first_value(DESCRIPTIVE_KEYS)
-if not out:
-    out = _first_value(PROVIDER_KEYS, allow_provider=True)
-if out:
-    print(out)
-PY
-)"
-            else
-                local role_key=""
-                kv="$(grep -Eo '"(plan|scheme|role_type|roleType|roleset|role|type|profile|group|team|mode|name|roles|executor|reviewer|documenter|designer|searcher|web_searcher|repo_searcher|git_manager)"\\s*:\\s*"[^"]+"' "$cfg" 2>/dev/null | head -n1 || true)"
-                role="$(printf '%s' "$kv" | sed -E 's/.*:"([^"]+)"/\\1/' || true)"
-                role_key="$(printf '%s' "$kv" | sed -E 's/^"([^"]+)".*/\\1/' || true)"
-                if [[ -n "$role" ]]; then
-                    local role_lc
-                    role_lc="$(printf '%s' "$role" | tr '[:upper:]' '[:lower:]')"
-                    local tokens
-                    tokens="$(printf '%s' "$role_lc" | tr '+,/' '   ' | tr -c 'a-z0-9_ ' ' ')"
-                    local providerish=1
-                    local t
-                    for t in $tokens; do
-                        case "$t" in
-                            claude|codex|opencode|gemini|droid|oc|cc|ge|dr) ;;
-                            *) providerish=0; break ;;
-                        esac
-                    done
-                    case "$role_key" in
-                        name|executor|reviewer|documenter|designer|searcher|web_searcher|repo_searcher|git_manager)
-                            providerish=0
-                            ;;
-                    esac
-                    if (( providerish )); then
-                        role=""
-                    fi
-                fi
-            fi
-            break
-        fi
-    done
-
-    if [[ -n "$role" ]]; then
-        echo "$role"
-    else
-        echo "OFF"
-    fi
-}
-
 # Get queue depth for a daemon (if available)
 get_queue_depth() {
     local name="$1"
@@ -214,9 +89,6 @@ main() {
     local mode="${1:-full}"
     local cache_s="${CCB_STATUS_CACHE_S:-1}"
     local cache_key=""
-    if [[ "$mode" == "cca" ]]; then
-        cache_key="$(printf '%s' "${2:-}" | cksum 2>/dev/null | awk '{print $1}')"
-    fi
     local cache_suffix="${cache_key:-default}"
     local cache_file="$TMP_DIR/ccb-status.${mode}.${cache_suffix}.cache"
 
@@ -355,10 +227,6 @@ main() {
                     *)            echo "[$ai_name]" ;;
                 esac
             fi
-            ;;
-        cca)
-            local work_dir="${2:-}"
-            out="$(cca_status_for_path "$work_dir")"
             ;;
     esac
 
