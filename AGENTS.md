@@ -34,7 +34,7 @@
 
 - Commit messages follow a Conventional-Commits style seen in history: `feat: …`, `fix: …`, `refactor: …`, `chore: …`, `release: …` (optional scope like `fix(askd_client): …`).
 - PRs should include: what changed, why, how to test, and any OS-specific notes (Windows/WSL/macOS/Linux).
-- Update `README.md`/`CHANGELOG.md` when changing user-facing commands, flags, or defaults.
+- Update `README.md` when changing user-facing commands, flags, or defaults.
 
 ## Security & Configuration Tips
 

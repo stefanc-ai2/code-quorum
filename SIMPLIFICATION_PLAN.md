@@ -342,9 +342,7 @@ Delete MCP delegation server and its CLI/install hooks.
 
 **Files to MODIFY (minimum):**
 - `README.md` - remove provider lists beyond codex/claude; remove Windows/WSL + MCP sections; remove `pend` usage
-- `README_zh.md` - same
 - `CLAUDE.md` - update architecture/entrypoints/provider list to match 2-provider + no pend + no MCP
-- `CHANGELOG.md` - add an Unreleased entry describing the simplification (and mark breaking changes)
 
 **Verification:**
 - No references to removed providers/pend/MCP in docs (except historical changelog files)
@@ -486,7 +484,7 @@ codex_skills/ask/       - Add reply instructions
 
 ## Search-and-Kill Checklist (expected → zero)
 
-- Providers: `gemini|opencode|droid` (outside changelog history files)
-- Commands: `pend\\b` (outside this plan and changelog history files)
-- Platforms: `win32|powershell|WSL|wsl\\.localhost` (outside `CHANGELOG_4.0.md`/archived notes)
+- Providers: `gemini|opencode|droid` (outside this plan / archived notes)
+- Commands: `pend\\b` (outside this plan / archived notes)
+- Platforms: `win32|powershell|WSL|wsl\\.localhost` (outside archived notes)
 - MCP: legacy droid delegation server + setup command references
