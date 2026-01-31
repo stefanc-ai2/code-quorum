@@ -48,7 +48,6 @@ from compat import read_stdin_text, setup_windows_encoding
 setup_windows_encoding()
 
 from ccb_protocol import make_req_id, wrap_reply_payload, wrap_request_prompt
-from claude_protocol import apply_claude_skills
 from claude_session import load_project_session as load_claude_session
 from cli_output import EXIT_ERROR, EXIT_OK
 from codex_session import load_project_session as load_codex_session
@@ -172,8 +171,6 @@ def main(argv: list[str]) -> int:
         outbound_req_id = reply_to_req_id
     else:
         outbound_req_id = req_id
-        if provider == "claude":
-            message = apply_claude_skills(message)
         outbound = wrap_request_prompt(message, req_id)
 
     work_dir = Path.cwd()
