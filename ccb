@@ -32,10 +32,7 @@ from ccb_start_config import DEFAULT_PROVIDERS, ensure_default_start_config, loa
 from session_utils import safe_write_session, check_session_writable, find_project_session_file
 from pane_registry import upsert_registry
 from project_id import compute_ccb_project_id
-from providers import CASK_CLIENT_SPEC, LASK_CLIENT_SPEC
 from process_lock import ProviderLock
-from askd_rpc import shutdown_daemon, read_state
-from askd_runtime import state_file_path
 from i18n import t
 
 setup_windows_encoding()
@@ -392,7 +389,7 @@ def _shrink_ccb_logs() -> int:
     if max_bytes <= 0:
         return 0
 
-    # Cache directory (matches lib/askd_runtime.py defaults)
+    # Cache directory (CCB state + historical logs).
     cache_dir: Path | None = None
     xdg_cache = (os.environ.get("XDG_CACHE_HOME") or "").strip()
     if xdg_cache:
@@ -470,7 +467,6 @@ class AILauncher:
         self.runtime_dir = self.temp_base / f"claude-ai-{getpass.getuser()}" / self.session_id
         self.runtime_dir.mkdir(parents=True, exist_ok=True)
         self._cleaned = False
-        self._askd_checked = False
         self.terminal_type = self._detect_terminal_type()
         self.tmux_sessions = {}
         self.tmux_panes = {}
@@ -620,113 +616,6 @@ class AILauncher:
         if not shutil.which(shell):
             shell = "bash"
         return subprocess.run([shell, "-lc", cmd], env=env, cwd=cwd).returncode
-
-    def _maybe_start_caskd(self) -> None:
-        self._maybe_start_provider_daemon("codex")
-
-    def _maybe_start_provider_daemon(self, provider: str) -> None:
-        def _bool_from_env(name: str):
-            raw = os.environ.get(name)
-            if raw is None or raw == "":
-                return None
-            v = raw.strip().lower()
-            if v in {"0", "false", "no", "off"}:
-                return False
-            if v in {"1", "true", "yes", "on"}:
-                return True
-            return None
-
-        provider = (provider or "").strip().lower()
-        specs = {
-            "codex": CASK_CLIENT_SPEC,
-            "claude": LASK_CLIENT_SPEC,
-        }
-        spec = specs.get(provider)
-        if not spec:
-            return
-        if provider not in [p.lower() for p in self.providers]:
-            return
-
-        autostart = _bool_from_env(spec.autostart_env_primary)
-        if autostart is None:
-            autostart = _bool_from_env(spec.autostart_env_legacy)
-        if autostart is False:
-            return
-        if _bool_from_env(spec.enabled_env) is False:
-            return
-
-        try:
-            from importlib import import_module
-            daemon_module = import_module(spec.daemon_module)
-            ping_daemon = getattr(daemon_module, "ping_daemon")
-            read_state = getattr(daemon_module, "read_state", None)
-            shutdown_daemon_fn = getattr(daemon_module, "shutdown_daemon", None)
-        except Exception as exc:
-            print(f"⚠️ Failed to import {spec.daemon_module}: {exc}")
-            return
-
-        state_file = None
-        raw_state_file = (os.environ.get(spec.state_file_env) or "").strip()
-        if raw_state_file:
-            try:
-                state_file = Path(raw_state_file).expanduser()
-            except Exception:
-                state_file = None
-
-        if ping_daemon(state_file=state_file):
-            st = read_state(state_file=state_file) or {} if callable(read_state) else {}
-            if spec.daemon_bin_name == "askd":
-                self._askd_checked = True
-            host = st.get("host") if isinstance(st, dict) else None
-            port = st.get("port") if isinstance(st, dict) else None
-            if host and port:
-                print(f"✅ {spec.daemon_bin_name} already running at {host}:{port}")
-            else:
-                print(f"✅ {spec.daemon_bin_name} already running")
-            return
-
-        daemon_script = self.script_dir / "bin" / spec.daemon_bin_name
-        if not daemon_script.exists():
-            print(f"⚠️ {spec.daemon_bin_name} not found (bin/{spec.daemon_bin_name}). Reinstall or update your checkout.")
-            return
-
-        kwargs = {
-            "stdin": subprocess.DEVNULL,
-            "stdout": subprocess.DEVNULL,
-            "stderr": subprocess.DEVNULL,
-            "close_fds": True,
-            "start_new_session": True,
-        }
-
-        try:
-            env = os.environ.copy()
-            if spec.daemon_bin_name == "askd":
-                # askd should remain available after `ccb` returns so that `ask` works
-                # from other shells/panes. Use a bounded idle timeout instead of
-                # binding daemon lifetime to this launcher process.
-                env.pop("CCB_PARENT_PID", None)
-                env["CCB_MANAGED"] = "0"
-                env.setdefault("CCB_ASKD_IDLE_TIMEOUT_S", "3600")
-            else:
-                env["CCB_PARENT_PID"] = str(os.getpid())
-            subprocess.Popen([sys.executable, str(daemon_script)], env=env, **kwargs)
-        except Exception as exc:
-            print(f"⚠️ Failed to start {spec.daemon_bin_name}: {exc}")
-            return
-
-        deadline = time.time() + 2.0
-        while time.time() < deadline:
-            if ping_daemon(timeout_s=0.2, state_file=state_file):
-                st = read_state(state_file=state_file) or {} if callable(read_state) else {}
-                host = st.get("host") if isinstance(st, dict) else None
-                port = st.get("port") if isinstance(st, dict) else None
-                if host and port:
-                    print(f"✅ {spec.daemon_bin_name} started at {host}:{port}")
-                else:
-                    print(f"✅ {spec.daemon_bin_name} started")
-                return
-            time.sleep(0.1)
-        print(f"⚠️ {spec.daemon_bin_name} start requested, but daemon not reachable yet")
 
     def _detect_terminal_type(self):
         # Forced by environment variable
@@ -1052,7 +941,6 @@ class AILauncher:
                 )
             except Exception:
                 pass
-        self._maybe_start_provider_daemon("claude")
 
     def _get_latest_codex_session_id(self) -> tuple[str | None, bool]:
         """
@@ -1593,9 +1481,6 @@ class AILauncher:
             codex_start_cmd=start_cmd,
         )
 
-        # Optional: start caskd after Codex session file exists (first startup convenience).
-        self._maybe_start_caskd()
-
         if self.terminal_type == "tmux":
             bridge_script = self.script_dir / "lib" / "codex_dual_bridge.py"
             bridge_env = os.environ.copy()
@@ -1714,7 +1599,6 @@ class AILauncher:
             })
         except Exception:
             pass
-        self._maybe_start_provider_daemon("codex")
         return True
 
     def _write_cend_registry(self, claude_pane_id: str, codex_pane_id: str | None) -> bool:
@@ -2043,22 +1927,6 @@ class AILauncher:
                     except Exception:
                         pass
 
-        # Ensure unified askd daemon exits when CCB exits.
-        try:
-            askd_state = state_file_path("askd.json")
-            st = read_state(askd_state) or {}
-            if isinstance(st, dict):
-                try:
-                    parent_pid = int(st.get("parent_pid") or 0)
-                except Exception:
-                    parent_pid = 0
-                managed = bool(st.get("managed"))
-                # Only shut down askd if it's bound to this CCB instance.
-                if managed and parent_pid == self.ccb_pid:
-                    shutdown_daemon("ask", 1.0, askd_state)
-        except Exception:
-            pass
-
         if remove_runtime:
             import shutil
             if self.runtime_dir.exists():
@@ -2217,10 +2085,6 @@ class AILauncher:
             if not pane_id:
                 return 1
             last_right = pane_id
-
-        # Optional: start caskd after Codex session file exists (first startup convenience).
-        if "codex" in self.providers and self.anchor_provider != "codex":
-            self._maybe_start_caskd()
 
         try:
             try:
@@ -2535,12 +2399,6 @@ def cmd_kill(args):
     if not providers:
         return 2
 
-    # Map provider names to their client specs to find daemon info
-    specs = {
-        "codex": CASK_CLIENT_SPEC,
-        "claude": LASK_CLIENT_SPEC,
-    }
-
     for provider in providers:
         # 1. Kill UI sessions (tmux/wezterm)
         session_file = find_project_session_file(Path.cwd(), f".{provider}-session")
@@ -2573,27 +2431,6 @@ def cmd_kill(args):
                 print(f"❌ {provider}: {e}")
         else:
              print(f"ℹ️  {provider}: No active session file found")
-
-        # 2. Kill background daemon (graceful shutdown, then force kill)
-        spec = specs.get(provider)
-        if spec:
-            daemon_name = spec.daemon_bin_name
-            st_file = state_file_path(f"{daemon_name}.json")
-
-            try:
-                if shutdown_daemon(spec.protocol_prefix, 1.0, st_file):
-                    print(f"✅ {daemon_name} daemon shutdown requested")
-                else:
-                    # Graceful shutdown failed, try force kill using PID from state file
-                    st = read_state(st_file)
-                    if st and st.get("pid"):
-                        pid = int(st["pid"])
-                        if _kill_pid(pid, force=True):
-                            print(f"✅ {daemon_name} daemon force killed (pid={pid})")
-                        else:
-                            print(f"⚠️ {daemon_name} daemon could not be killed (pid={pid})")
-            except Exception:
-                pass
 
     return 0
 

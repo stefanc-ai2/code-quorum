@@ -126,6 +126,7 @@ LEGACY_SCRIPTS=(
   gping
   oping
   dping
+  askd
   caskd
   gaskd
   oaskd
@@ -1125,7 +1126,7 @@ install_requirements() {
   fi
 }
 
-# Clean up legacy daemon files (replaced by unified askd)
+# Clean up legacy daemon files
 cleanup_legacy_files() {
   echo "Cleaning up legacy files..."
   local cleaned=0

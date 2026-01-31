@@ -37,7 +37,6 @@ def test_run_up_sorts_providers_in_tmux(monkeypatch, tmp_path: Path) -> None:
 
     monkeypatch.setattr(launcher, "_start_provider", _start_provider)
     monkeypatch.setattr(launcher, "_warmup_provider", lambda *_args, **_kwargs: True)
-    monkeypatch.setattr(launcher, "_maybe_start_caskd", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(launcher, "_start_claude", lambda: 0)
     monkeypatch.setattr(launcher, "_start_provider_in_current_pane", lambda *_args, **_kwargs: 0)
     monkeypatch.setattr(launcher, "cleanup", lambda: None)
