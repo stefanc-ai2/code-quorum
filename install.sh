@@ -15,7 +15,6 @@ fi
 SCRIPTS_TO_LINK=(
   bin/ask
   bin/ping
-  bin/autonew
   ccb
 )
 
@@ -381,7 +380,46 @@ install_bin_links() {
     rm -f "$BIN_DIR/$legacy"
   done
 
+  cleanup_bin_dir_symlinks
+
   echo "Created executable links in $BIN_DIR"
+}
+
+cleanup_bin_dir_symlinks() {
+  # Remove symlinks under BIN_DIR that point into INSTALL_PREFIX but are not part of SCRIPTS_TO_LINK.
+  # This helps upgrades remove deprecated commands without hardcoding legacy names.
+  local expected_names=()
+  local path
+  for path in "${SCRIPTS_TO_LINK[@]}"; do
+    expected_names+=("$(basename "$path")")
+  done
+
+  shopt -s nullglob
+  local p
+  for p in "$BIN_DIR"/*; do
+    [[ -L "$p" ]] || continue
+    local target
+    target="$(readlink "$p" 2>/dev/null || true)"
+    [[ -n "$target" ]] || continue
+    case "$target" in
+      "$INSTALL_PREFIX"/*)
+        local name
+        name="$(basename "$p")"
+        local keep=0
+        local expected
+        for expected in "${expected_names[@]}"; do
+          if [[ "$name" == "$expected" ]]; then
+            keep=1
+            break
+          fi
+        done
+        if [[ $keep -eq 0 ]]; then
+          rm -f "$p" || true
+        fi
+        ;;
+    esac
+  done
+  shopt -u nullglob
 }
 
 ensure_path_configured() {
@@ -1110,7 +1148,7 @@ except Exception:
 
 uninstall_claude_skills() {
   local skills_dst="$HOME/.claude/skills"
-  local ccb_skills="ask ping autonew mounted all-plan"
+  local ccb_skills="ask ping mounted all-plan"
 
   if [[ ! -d "$skills_dst" ]]; then
     return
