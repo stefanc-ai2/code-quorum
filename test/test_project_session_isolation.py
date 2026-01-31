@@ -7,8 +7,8 @@ from pathlib import Path
 import pytest
 
 import pane_registry
-from caskd_session import load_project_session as load_codex_session
-from laskd_session import load_project_session as load_claude_session
+from codex_session import load_project_session as load_codex_session
+from claude_session import load_project_session as load_claude_session
 from project_id import compute_ccb_project_id
 
 

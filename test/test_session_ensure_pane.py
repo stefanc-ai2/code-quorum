@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-import caskd_session
+import codex_session
 
 
 class FakeBackend:
@@ -42,9 +42,9 @@ def test_ensure_pane_marker_rediscovers(tmp_path: Path, monkeypatch: pytest.Monk
         alive_panes={"%1": False, "%2": True},
         marker_map={"CCB-codex": "%2"}
     )
-    monkeypatch.setattr(caskd_session, "get_backend_for_session", lambda data: fake_backend)
+    monkeypatch.setattr(codex_session, "get_backend_for_session", lambda data: fake_backend)
 
-    sess = caskd_session.load_project_session(tmp_path)
+    sess = codex_session.load_project_session(tmp_path)
     assert sess is not None
 
     ok, pane = sess.ensure_pane()
@@ -69,9 +69,9 @@ def test_ensure_pane_already_alive(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     }), encoding="utf-8")
 
     fake_backend = FakeBackend(alive_panes={"%1": True})
-    monkeypatch.setattr(caskd_session, "get_backend_for_session", lambda data: fake_backend)
+    monkeypatch.setattr(codex_session, "get_backend_for_session", lambda data: fake_backend)
 
-    sess = caskd_session.load_project_session(tmp_path)
+    sess = codex_session.load_project_session(tmp_path)
     assert sess is not None
 
     ok, pane = sess.ensure_pane()
@@ -90,9 +90,9 @@ def test_ensure_pane_no_backend(tmp_path: Path, monkeypatch: pytest.MonkeyPatch)
         "active": True,
     }), encoding="utf-8")
 
-    monkeypatch.setattr(caskd_session, "get_backend_for_session", lambda data: None)
+    monkeypatch.setattr(codex_session, "get_backend_for_session", lambda data: None)
 
-    sess = caskd_session.load_project_session(tmp_path)
+    sess = codex_session.load_project_session(tmp_path)
     assert sess is not None
 
     ok, msg = sess.ensure_pane()
@@ -113,9 +113,9 @@ def test_ensure_pane_dead_no_marker(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     }), encoding="utf-8")
 
     fake_backend = FakeBackend(alive_panes={"%1": False}, marker_map={})
-    monkeypatch.setattr(caskd_session, "get_backend_for_session", lambda data: fake_backend)
+    monkeypatch.setattr(codex_session, "get_backend_for_session", lambda data: fake_backend)
 
-    sess = caskd_session.load_project_session(tmp_path)
+    sess = codex_session.load_project_session(tmp_path)
     assert sess is not None
 
     ok, msg = sess.ensure_pane()

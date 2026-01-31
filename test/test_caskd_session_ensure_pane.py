@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-import caskd_session
+import codex_session
 
 
 class FakeTmuxBackend:
@@ -33,7 +33,7 @@ class FakeTmuxBackend:
         self.alive[pane_id] = True
 
 
-def test_caskd_ensure_pane_respawns_dead_pane(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_codex_ensure_pane_respawns_dead_pane(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """When pane is dead, ensure_pane should respawn it and update session file."""
     session_path = tmp_path / ".codex-session"
     session_path.write_text(
@@ -53,9 +53,9 @@ def test_caskd_ensure_pane_respawns_dead_pane(tmp_path: Path, monkeypatch: pytes
     backend = FakeTmuxBackend()
     backend.alive = {"%1": False, "%2": False}
     backend.marker_map = {"CCB-codex": "%2"}
-    monkeypatch.setattr(caskd_session, "get_backend_for_session", lambda data: backend)
+    monkeypatch.setattr(codex_session, "get_backend_for_session", lambda data: backend)
 
-    sess = caskd_session.load_project_session(tmp_path)
+    sess = codex_session.load_project_session(tmp_path)
     assert sess is not None
 
     ok, pane = sess.ensure_pane()
@@ -67,7 +67,7 @@ def test_caskd_ensure_pane_respawns_dead_pane(tmp_path: Path, monkeypatch: pytes
     assert data["pane_id"] == "%2"
 
 
-def test_caskd_ensure_pane_already_alive(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_codex_ensure_pane_already_alive(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """When pane is already alive, ensure_pane should return success immediately."""
     session_path = tmp_path / ".codex-session"
     session_path.write_text(
@@ -84,9 +84,9 @@ def test_caskd_ensure_pane_already_alive(tmp_path: Path, monkeypatch: pytest.Mon
 
     backend = FakeTmuxBackend()
     backend.alive = {"%1": True}
-    monkeypatch.setattr(caskd_session, "get_backend_for_session", lambda data: backend)
+    monkeypatch.setattr(codex_session, "get_backend_for_session", lambda data: backend)
 
-    sess = caskd_session.load_project_session(tmp_path)
+    sess = codex_session.load_project_session(tmp_path)
     assert sess is not None
 
     ok, pane = sess.ensure_pane()
@@ -95,7 +95,7 @@ def test_caskd_ensure_pane_already_alive(tmp_path: Path, monkeypatch: pytest.Mon
     assert backend.respawned == []
 
 
-def test_caskd_ensure_pane_marker_rediscover(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_codex_ensure_pane_marker_rediscover(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """When original pane is dead but marker finds alive pane, should update pane_id."""
     session_path = tmp_path / ".codex-session"
     session_path.write_text(
@@ -113,9 +113,9 @@ def test_caskd_ensure_pane_marker_rediscover(tmp_path: Path, monkeypatch: pytest
     backend = FakeTmuxBackend()
     backend.alive = {"%1": False, "%2": True}
     backend.marker_map = {"CCB-codex": "%2"}
-    monkeypatch.setattr(caskd_session, "get_backend_for_session", lambda data: backend)
+    monkeypatch.setattr(codex_session, "get_backend_for_session", lambda data: backend)
 
-    sess = caskd_session.load_project_session(tmp_path)
+    sess = codex_session.load_project_session(tmp_path)
     assert sess is not None
 
     ok, pane = sess.ensure_pane()

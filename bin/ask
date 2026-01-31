@@ -27,10 +27,10 @@ from compat import read_stdin_text, setup_windows_encoding
 setup_windows_encoding()
 
 from cli_output import EXIT_ERROR, EXIT_OK
-from caskd_session import load_project_session as load_codex_session
+from codex_session import load_project_session as load_codex_session
 from ccb_protocol import make_req_id, wrap_codex_prompt, wrap_reply_payload
-from laskd_protocol import wrap_claude_prompt
-from laskd_session import load_project_session as load_claude_session
+from claude_protocol import wrap_claude_prompt
+from claude_session import load_project_session as load_claude_session
 
 
 def _env_bool(name: str, default: bool = False) -> bool:

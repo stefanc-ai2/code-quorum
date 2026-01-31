@@ -23,8 +23,8 @@ sys.path.insert(0, str(lib_dir))
 from compat import setup_windows_encoding
 setup_windows_encoding()
 
-from caskd_session import CodexProjectSession, load_project_session as load_codex_session
-from laskd_session import ClaudeProjectSession, load_project_session as load_claude_session
+from codex_session import CodexProjectSession, load_project_session as load_codex_session
+from claude_session import ClaudeProjectSession, load_project_session as load_claude_session
 
 def _usage():
     print("Usage: ping <provider> [--session-file FILE]", file=sys.stderr)
