@@ -1260,18 +1260,18 @@ class AILauncher:
     def _warmup_provider(self, provider: str, timeout: float = 8.0) -> bool:
         if provider != "codex":
             return False
-        ping_script = self.script_dir / "bin" / "cping"
+        ping_script = self.script_dir / "bin" / "ping"
 
         if not ping_script.exists():
             return False
 
-        print(f"🔧 Warmup: {ping_script.name}")
+        print(f"🔧 Warmup: {ping_script.name} {provider}")
         deadline = time.time() + timeout
         last_result: subprocess.CompletedProcess[str] | None = None
         sleep_s = 0.3
         while time.time() < deadline:
             last_result = subprocess.run(
-                [sys.executable, str(ping_script)],
+                [sys.executable, str(ping_script), provider],
                 cwd=str(Path.cwd()),
                 capture_output=True,
                 text=True,
@@ -3086,7 +3086,6 @@ def cmd_update(args):
 
 _CLAUDE_COMMAND_DOCS = (
     "cpend.md",
-    "cping.md",
     "gpend.md",
     "gping.md",
     "opend.md",
@@ -3152,7 +3151,6 @@ def _cleanup_claude_files() -> None:
                 to_remove = {
                     "Bash(cask:*)",
                     "Bash(cpend)",
-                    "Bash(cping)",
                     "Bash(gask:*)",
                     "Bash(gpend)",
                     "Bash(gping)",

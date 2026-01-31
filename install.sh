@@ -13,8 +13,6 @@ if [[ "${EUID:-$(id -u)}" -eq 0 ]]; then
 fi
 
 SCRIPTS_TO_LINK=(
-  bin/cping
-  bin/lping
   bin/ask
   bin/ping
   bin/autonew
@@ -36,6 +34,8 @@ LEGACY_SCRIPTS=(
   claude_ai
   claude_bridge
   # Removed provider-specific CLIs (kept for uninstall/upgrade cleanup)
+  cping
+  lping
   cask
   lask
   gask
