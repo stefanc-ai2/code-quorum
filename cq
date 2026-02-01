@@ -2513,7 +2513,7 @@ def cmd_version(args):
     # Candidate directories (highest priority first)
     candidates = [
         script_root,  # current script directory
-        Path(os.environ.get("CODEX_INSTALL_PREFIX", "")).expanduser() if os.environ.get("CODEX_INSTALL_PREFIX") else None,
+        Path(os.environ.get("CQ_INSTALL_PREFIX", "")).expanduser() if os.environ.get("CQ_INSTALL_PREFIX") else None,
         Path.home() / ".local/share/code-quorum",  # Linux/macOS
         Path.home() / ".local/share/codex-dual",  # legacy
     ]
@@ -2566,7 +2566,7 @@ def cmd_update(args):
     # Prefer the directory where this script resides (installed copy), then fall back to env/default.
     script_root = Path(__file__).resolve().parent
     default_install_dir = Path.home() / ".local/share/code-quorum"
-    install_dir = Path(os.environ.get("CODEX_INSTALL_PREFIX") or default_install_dir).expanduser()
+    install_dir = Path(os.environ.get("CQ_INSTALL_PREFIX") or default_install_dir).expanduser()
     if (script_root / "install.sh").exists():
         install_dir = script_root
     repo_url = "https://github.com/stefanc-ai2/code-quorum"
@@ -2745,7 +2745,7 @@ def cmd_update(args):
 
         print("🔧 Installing...")
         env = os.environ.copy()
-        env["CODEX_INSTALL_PREFIX"] = str(install_dir)
+        env["CQ_INSTALL_PREFIX"] = str(install_dir)
         subprocess.run([str(extracted_dir / "install.sh"), "install"], check=True, env=env)
 
         # Show upgrade info
@@ -2853,7 +2853,7 @@ def _cleanup_claude_files() -> None:
 def _find_install_dir() -> Path:
     script_root = Path(__file__).resolve().parent
     candidates: list[Path] = []
-    env_prefix = (os.environ.get("CODEX_INSTALL_PREFIX") or "").strip()
+    env_prefix = (os.environ.get("CQ_INSTALL_PREFIX") or "").strip()
     if env_prefix:
         candidates.append(Path(env_prefix).expanduser())
 
@@ -2874,10 +2874,10 @@ def _run_installer(action: str) -> int:
         print(f"❌ install.sh not found in {install_dir}", file=sys.stderr)
         return 1
     env = os.environ.copy()
-    # Only force CODEX_INSTALL_PREFIX when it looks like we're running from an installed copy.
+    # Only force CQ_INSTALL_PREFIX when it looks like we're running from an installed copy.
     # If invoked from a git checkout, overriding would risk deleting the checkout directory on uninstall.
     if not (install_dir / ".git").exists():
-        env["CODEX_INSTALL_PREFIX"] = str(install_dir)
+        env["CQ_INSTALL_PREFIX"] = str(install_dir)
     return subprocess.run(["bash", str(script), action], env=env).returncode
 
 

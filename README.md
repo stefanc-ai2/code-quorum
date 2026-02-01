@@ -43,8 +43,8 @@ From a repo checkout:
 ```
 
 This installs:
-- executables into `~/.local/bin` (or `$CODEX_BIN_DIR`)
-- project files into `~/.local/share/code-quorum` (or `$CODEX_INSTALL_PREFIX`)
+- executables into `~/.local/bin` (or `$CQ_BIN_DIR`)
+- project files into `~/.local/share/code-quorum` (or `$CQ_INSTALL_PREFIX`)
 - skills into `~/.claude/skills` and `${CODEX_HOME:-~/.codex}/skills`
 
 Uninstall:

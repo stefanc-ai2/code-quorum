@@ -2,8 +2,8 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-INSTALL_PREFIX="${CODEX_INSTALL_PREFIX:-$HOME/.local/share/code-quorum}"
-BIN_DIR="${CODEX_BIN_DIR:-$HOME/.local/bin}"
+INSTALL_PREFIX="${CQ_INSTALL_PREFIX:-$HOME/.local/share/code-quorum}"
+BIN_DIR="${CQ_BIN_DIR:-$HOME/.local/bin}"
 readonly REPO_ROOT INSTALL_PREFIX BIN_DIR
 
 LEGACY_PREFIX="c""c""b"
@@ -62,16 +62,16 @@ Usage:
   ./install.sh uninstall  # Uninstall installed content
 
 Optional environment variables:
-  CODEX_INSTALL_PREFIX     Install directory (default: ~/.local/share/code-quorum)
-  CODEX_BIN_DIR            Executable directory (default: ~/.local/bin)
-  CODEX_CLAUDE_COMMAND_DIR Custom Claude commands directory (default: auto-detect)
+  CQ_INSTALL_PREFIX        Install directory (default: ~/.local/share/code-quorum)
+  CQ_BIN_DIR               Executable directory (default: ~/.local/bin)
+  CQ_CLAUDE_COMMAND_DIR    Custom Claude commands directory (default: auto-detect)
   CQ_PYTHON_BIN            Python interpreter override (default: auto-detect)
 USAGE
 }
 
 detect_claude_dir() {
-  if [[ -n "${CODEX_CLAUDE_COMMAND_DIR:-}" ]]; then
-    echo "$CODEX_CLAUDE_COMMAND_DIR"
+  if [[ -n "${CQ_CLAUDE_COMMAND_DIR:-}" ]]; then
+    echo "$CQ_CLAUDE_COMMAND_DIR"
     return
   fi
 
