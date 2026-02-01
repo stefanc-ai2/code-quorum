@@ -1,6 +1,6 @@
 ---
 name: all-plan
-description: Collaborative planning with mounted CLIs only. Automatically detects active providers via ccb-mounted.
+description: Collaborative planning with mounted CLIs only. Automatically detects active providers via cq-mounted.
 metadata:
   short-description: Collaborative planning with mounted CLIs
 ---
@@ -9,7 +9,7 @@ metadata:
 
 Collaborative planning involving only the mounted/active CLIs with iterative refinement.
 
-**IMPORTANT**: This skill automatically detects which providers are active by running `ccb-mounted`. It will only dispatch to providers that are actually mounted. For example, if you ran `ccb claude codex`, only Claude and Codex will participate in the planning.
+**IMPORTANT**: This skill automatically detects which providers are active by running `cq-mounted` (or `ccb-mounted` for compatibility). It will only dispatch to providers that are actually mounted. For example, if you ran `cq claude codex`, only Claude and Codex will participate in the planning.
 
 Note: After dispatching planning requests via `ask`, draft your own independent design, then end your turn to collect replies via reply-via-ask.
 

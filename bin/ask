@@ -184,7 +184,7 @@ def main(argv: list[str]) -> int:
             f"[ERROR] No active {provider} session found for this directory.",
             file=sys.stderr,
         )
-        print(f"[ERROR] Run `ccb {provider}` in this project first.", file=sys.stderr)
+        print(f"[ERROR] Run `cq {provider}` in this project first. (Alias: `ccb {provider}`)", file=sys.stderr)
         return EXIT_ERROR
 
     ok, pane_or_err = session.ensure_pane()

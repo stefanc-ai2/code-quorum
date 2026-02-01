@@ -20,7 +20,7 @@ From `$ARGUMENTS`:
 
 Run:
 ```bash
-ccb-mounted
+cq-mounted || ccb-mounted
 ```
 
 This returns JSON like:
@@ -616,6 +616,6 @@ Next: Review the plan and proceed with implementation when ready.
 - This skill is designed for complex features or architectural decisions
 - For simple tasks, use dual-design or direct implementation instead
 - This flow is multi-turn: dispatch via `ask`, then continue once reply-via-ask results arrive in-pane
-- **CRITICAL**: Always run `ccb-mounted` first to detect which providers are active. Only dispatch to providers in the `mounted` array
+- **CRITICAL**: Always run `cq-mounted` (or `ccb-mounted`) first to detect which providers are active. Only dispatch to providers in the `mounted` array
 - If only Claude and Codex are mounted, the collaboration will be between those two only
 - Plans are saved to `.ccb_config/plans/` with descriptive filenames

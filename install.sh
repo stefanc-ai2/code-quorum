@@ -2,7 +2,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-INSTALL_PREFIX="${CODEX_INSTALL_PREFIX:-$HOME/.local/share/codex-dual}"
+INSTALL_PREFIX="${CODEX_INSTALL_PREFIX:-$HOME/.local/share/code-quorum}"
 BIN_DIR="${CODEX_BIN_DIR:-$HOME/.local/bin}"
 readonly REPO_ROOT INSTALL_PREFIX BIN_DIR
 
@@ -15,6 +15,9 @@ fi
 SCRIPTS_TO_LINK=(
   bin/ask
   bin/ping
+  bin/cq-mounted
+  bin/ccb-mounted
+  cq
   ccb
 )
 
@@ -62,13 +65,14 @@ LEGACY_SCRIPTS=(
 usage() {
   cat <<'USAGE'
 Usage:
-  ./install.sh install    # Install or update Codex dual-window tools
+  ./install.sh install    # Install or update Code Quorum tools
   ./install.sh uninstall  # Uninstall installed content
 
 Optional environment variables:
-  CODEX_INSTALL_PREFIX     Install directory (default: ~/.local/share/codex-dual)
+  CODEX_INSTALL_PREFIX     Install directory (default: ~/.local/share/code-quorum)
   CODEX_BIN_DIR            Executable directory (default: ~/.local/bin)
   CODEX_CLAUDE_COMMAND_DIR Custom Claude commands directory (default: auto-detect)
+  CQ_PYTHON_BIN            Python interpreter override (default: auto-detect; legacy: CCB_PYTHON_BIN)
 USAGE
 }
 
@@ -106,7 +110,7 @@ require_command() {
   fi
 }
 
-PYTHON_BIN="${CCB_PYTHON_BIN:-}"
+PYTHON_BIN="${CQ_PYTHON_BIN:-${CCB_PYTHON_BIN:-}}"
 
 _python_check_310() {
   local cmd="$1"
@@ -141,7 +145,7 @@ pick_any_python_bin() {
 }
 
 require_python_version() {
-  # ccb requires Python 3.10+ (PEP 604 type unions: `str | None`, etc.)
+  # cq requires Python 3.10+ (PEP 604 type unions: `str | None`, etc.)
   if ! pick_python_bin; then
     echo "ERROR: Missing dependency: python (3.10+ required)"
     echo "   Please install Python 3.10+ and ensure it is on PATH, then re-run install.sh"
@@ -325,7 +329,7 @@ copy_project() {
   mv "$staging" "$INSTALL_PREFIX"
   trap - EXIT
 
-  # Update GIT_COMMIT and GIT_DATE in ccb file
+  # Update GIT_COMMIT and GIT_DATE in cq file
   local git_commit="" git_date=""
 
   # Method 1: From git repo
@@ -334,7 +338,7 @@ copy_project() {
     git_date=$(git -C "$REPO_ROOT" log -1 --format='%cs' 2>/dev/null || echo "")
   fi
 
-  # Method 2: From environment variables (set by ccb update)
+  # Method 2: From environment variables (set by ccb/cq update)
   if [[ -z "$git_commit" && -n "${CCB_GIT_COMMIT:-}" ]]; then
     git_commit="$CCB_GIT_COMMIT"
     git_date="${CCB_GIT_DATE:-}"
@@ -343,17 +347,17 @@ copy_project() {
   # Method 3: From GitHub API (fallback)
   if [[ -z "$git_commit" ]] && command -v curl >/dev/null 2>&1; then
     local api_response
-    api_response=$(curl -fsSL "https://api.github.com/repos/stefanc-ai2/claude_code_bridge/commits/main" 2>/dev/null || echo "")
+    api_response=$(curl -fsSL "https://api.github.com/repos/stefanc-ai2/code-quorum/commits/main" 2>/dev/null || echo "")
     if [[ -n "$api_response" ]]; then
       git_commit=$(echo "$api_response" | grep -o '"sha": "[^"]*"' | head -1 | cut -d'"' -f4 | cut -c1-7)
       git_date=$(echo "$api_response" | grep -o '"date": "[^"]*"' | head -1 | cut -d'"' -f4 | cut -c1-10)
     fi
   fi
 
-  if [[ -n "$git_commit" && -f "$INSTALL_PREFIX/ccb" ]]; then
-    sed -i.bak "s/^GIT_COMMIT = .*/GIT_COMMIT = \"$git_commit\"/" "$INSTALL_PREFIX/ccb"
-    sed -i.bak "s/^GIT_DATE = .*/GIT_DATE = \"$git_date\"/" "$INSTALL_PREFIX/ccb"
-    rm -f "$INSTALL_PREFIX/ccb.bak"
+  if [[ -n "$git_commit" && -f "$INSTALL_PREFIX/cq" ]]; then
+    sed -i.bak "s/^GIT_COMMIT = .*/GIT_COMMIT = \"$git_commit\"/" "$INSTALL_PREFIX/cq"
+    sed -i.bak "s/^GIT_DATE = .*/GIT_DATE = \"$git_date\"/" "$INSTALL_PREFIX/cq"
+    rm -f "$INSTALL_PREFIX/cq.bak"
   fi
 }
 
@@ -455,7 +459,7 @@ ensure_path_configured() {
 
   # Add to shell rc
   echo "" >> "$shell_rc"
-  echo "# Added by ccb installer" >> "$shell_rc"
+  echo "# Added by cq installer" >> "$shell_rc"
   echo "$path_line" >> "$shell_rc"
   echo "OK: Added $BIN_DIR to PATH in $shell_rc"
   echo "   Run: source $shell_rc  (or restart terminal)"
@@ -1149,7 +1153,7 @@ except Exception:
 
 uninstall_claude_skills() {
   local skills_dst="$HOME/.claude/skills"
-  local ccb_skills="ask ping mounted all-plan"
+  local ccb_skills="ask ping mounted all-plan poll pair"
 
   if [[ ! -d "$skills_dst" ]]; then
     return
@@ -1166,7 +1170,7 @@ uninstall_claude_skills() {
 
 uninstall_codex_skills() {
   local skills_dst="${CODEX_HOME:-$HOME/.codex}/skills"
-  local ccb_skills="ask ping mounted all-plan"
+  local ccb_skills="ask ping mounted all-plan poll pair"
 
   if [[ ! -d "$skills_dst" ]]; then
     return
@@ -1182,7 +1186,7 @@ uninstall_codex_skills() {
 }
 
 uninstall_all() {
-  echo "INFO: Starting ccb uninstall..."
+  echo "INFO: Starting cq uninstall..."
 
   # 1. Remove project directory
   if [[ -d "$INSTALL_PREFIX" ]]; then

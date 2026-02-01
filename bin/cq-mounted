@@ -1,0 +1,191 @@
+#!/usr/bin/env python3
+"""
+cq-mounted - Check which Code Quorum providers are mounted.
+
+A provider is "mounted" if:
+1. Session file exists (.ccb_config/.{provider}-session or .{provider}-session) and is active
+2. Pane is reachable/alive (best-effort) - OR socket access is blocked (sandbox mode)
+
+Usage:
+    cq-mounted [CWD] [--json|--simple] [--include-inactive]
+
+Examples:
+    cq-mounted
+    cq-mounted --simple
+    cq-mounted /path/to/project --json
+"""
+
+import sys
+import os
+import json
+import socket
+import argparse
+from pathlib import Path
+
+script_dir = Path(__file__).resolve().parent
+lib_dir = script_dir.parent / "lib"
+sys.path.insert(0, str(lib_dir))
+
+from terminal import get_backend_for_session, get_pane_id_from_session
+
+PROVIDERS = ["codex", "claude"]
+
+
+def find_session_file_path(cwd: Path, provider: str) -> Path | None:
+    """Return the provider session file path if present."""
+    candidates = (
+        cwd / ".ccb_config" / f".{provider}-session",
+        cwd / f".{provider}-session",
+    )
+    for p in candidates:
+        if p.exists():
+            return p
+    return None
+
+
+def session_file_is_active(path: Path) -> bool:
+    """
+    Determine whether a provider session file is active.
+
+    Backwards-compatible behavior:
+    - If `active` is explicitly `false`, treat it as inactive.
+    - If `active` is missing/unparseable, treat it as active.
+    """
+    try:
+        raw = path.read_text(encoding="utf-8-sig", errors="replace")
+        data = json.loads(raw)
+        if isinstance(data, dict) and data.get("active") is False:
+            return False
+    except Exception:
+        return True
+    return True
+
+
+def read_session_data(path: Path) -> dict:
+    try:
+        raw = path.read_text(encoding="utf-8-sig", errors="replace")
+        data = json.loads(raw)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def pane_alive_for_session(session_data: dict) -> bool | None:
+    """
+    Best-effort liveness check for a session's pane.
+
+    Returns:
+      - True: pane is alive
+      - False: pane is definitively dead
+      - None: unknown (missing data or cannot probe)
+    """
+    if not isinstance(session_data, dict) or not session_data:
+        return None
+
+    try:
+        backend = get_backend_for_session(session_data)
+    except Exception:
+        backend = None
+    if not backend:
+        return None
+
+    pane_id = get_pane_id_from_session(session_data) or session_data.get("claude_pane_id")
+    pane_id = str(pane_id or "").strip()
+    if not pane_id:
+        return None
+
+    try:
+        alive = bool(backend.is_alive(pane_id))
+        if alive:
+            return True
+        # If the backend couldn't probe liveness (e.g. wezterm cli list failed), treat as unknown.
+        last_err = getattr(backend, "last_list_error", None)
+        if last_err:
+            return None
+        return False
+    except Exception:
+        return None
+
+
+def can_connect_localhost() -> bool:
+    """Test if we can make localhost socket connections (sandbox check)."""
+    try:
+        # Try to create a socket and connect to a likely-closed port
+        # If we get "Operation not permitted", we're in a sandbox
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(0.1)
+        try:
+            # Port 1 is almost certainly not listening, so we expect connection refused
+            # But if we're sandboxed, we'll get permission denied
+            sock.connect(("127.0.0.1", 1))
+        except PermissionError:
+            # Sandbox detected
+            return False
+        except (socket.timeout, ConnectionRefusedError, OSError):
+            # Normal behavior - we can attempt connections
+            return True
+        finally:
+            sock.close()
+    except Exception:
+        return True  # Assume we can connect if test fails unexpectedly
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        prog=Path(sys.argv[0]).name or "cq-mounted",
+        description="Check which Code Quorum providers are mounted for a project directory.",
+    )
+    parser.add_argument("cwd", nargs="?", default=".", help="Project directory (default: current working directory).")
+    fmt_group = parser.add_mutually_exclusive_group()
+    fmt_group.add_argument("--json", action="store_true", help="Output JSON (default).")
+    fmt_group.add_argument("--simple", action="store_true", help="Output providers as a space-separated list.")
+    parser.add_argument(
+        "--include-inactive",
+        action="store_true",
+        help="Include inactive sessions (active=false).",
+    )
+
+    args = parser.parse_args()
+    try:
+        cwd = Path(args.cwd).expanduser()
+    except Exception:
+        cwd = Path(args.cwd)
+    try:
+        cwd = cwd.resolve(strict=False)
+    except Exception:
+        pass
+    include_inactive = bool(args.include_inactive)
+
+    # Check if we're in a sandboxed environment
+    sandboxed = not can_connect_localhost()
+
+    mounted = []
+
+    for provider in PROVIDERS:
+        session_file = find_session_file_path(cwd, provider)
+        if not session_file:
+            continue
+        if (not include_inactive) and (not session_file_is_active(session_file)):
+            continue
+
+        # Session exists (and is active unless include_inactive is set).
+        if sandboxed:
+            # In sandbox, trust session + active flag only.
+            mounted.append(provider)
+            continue
+
+        data = read_session_data(session_file)
+        alive = pane_alive_for_session(data)
+        if alive is False:
+            continue
+        mounted.append(provider)
+
+    if args.simple:
+        print(" ".join(mounted))
+    else:
+        result = {"cwd": str(cwd), "mounted": mounted}
+        print(json.dumps(result))
+
+
+if __name__ == "__main__":
+    main()

@@ -4,7 +4,9 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Project Overview
 
-Claude Code Bridge (`ccb`) is a split-pane collaboration tool for **Claude** and **Codex**.
+Code Quorum (`cq`) is a split-pane collaboration tool for **Claude** and **Codex**.
+
+Compatibility: legacy `ccb` / `ccb-mounted` are kept as aliases during transition.
 
 Current design constraints:
 - Providers: `claude`, `codex` only
@@ -19,7 +21,7 @@ Current design constraints:
 
 ```bash
 # Syntax check
-python -m compileall -q lib bin ccb test
+python -m compileall -q lib bin ccb cq test
 
 # Run all tests
 python -m pytest test/ -v --tb=short
@@ -32,10 +34,11 @@ TERM=xterm-256color python -m pytest test/ -v --tb=short
 
 ### Entry points
 
-- `ccb`: launcher/orchestrator (starts panes, writes `.ccb_config/.{provider}-session`)
+- `cq`: launcher/orchestrator (starts panes, writes `.ccb_config/.{provider}-session`)
 - `bin/ask`: send-only message delivery into a provider pane (async; prints req_id)
 - `bin/ping`: provider connectivity check
-- `bin/ccb-mounted`: report mounted providers for the current directory
+- `bin/cq-mounted`: report mounted providers for the current directory
+- `ccb` / `bin/ccb-mounted`: legacy compatibility wrappers
 
 ### Key modules
 

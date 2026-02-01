@@ -15,15 +15,15 @@ From `$ARGUMENTS`:
 
 Run:
 ```bash
-ccb-mounted
+cq-mounted || ccb-mounted
 ```
 
-If `ccb-mounted` succeeds and returns a `mounted[]` list, define:
+If `cq-mounted` succeeds (or `ccb-mounted` succeeds) and returns a `mounted[]` list, define:
 - For this skill, `{self} = codex`
 - `respondents = mounted - {self}`
 - If `respondents=...` is provided, use `respondents = (mounted ∩ requested_respondents) - {self}`
 
-If `ccb-mounted` fails (non-zero) or returns invalid/empty output:
+If `cq-mounted` (and `ccb-mounted`) fails (non-zero) or returns invalid/empty output:
 - If `respondents=...` is provided, use `respondents = requested_respondents - {self}`
 - Otherwise proceed solo
 

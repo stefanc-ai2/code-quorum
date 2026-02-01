@@ -7,8 +7,8 @@ from pathlib import Path
 
 
 def _load_ccb_mounted_module(repo_root: Path):
-    loader = SourceFileLoader("ccb_mounted", str(repo_root / "bin" / "ccb-mounted"))
-    spec = importlib.util.spec_from_loader("ccb_mounted", loader)
+    loader = SourceFileLoader("cq_mounted", str(repo_root / "bin" / "cq-mounted"))
+    spec = importlib.util.spec_from_loader("cq_mounted", loader)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -28,7 +28,7 @@ def test_ccb_mounted_filters_inactive_sessions_simple(tmp_path, monkeypatch, cap
     monkeypatch.setattr(ccb_mounted, "can_connect_localhost", lambda: True)
     monkeypatch.setattr(ccb_mounted, "pane_alive_for_session", lambda _data: None)
 
-    monkeypatch.setattr(ccb_mounted.sys, "argv", ["ccb-mounted", str(work_dir), "--simple"])
+    monkeypatch.setattr(ccb_mounted.sys, "argv", ["cq-mounted", str(work_dir), "--simple"])
     ccb_mounted.main()
 
     out = capsys.readouterr().out.strip()
@@ -48,7 +48,7 @@ def test_ccb_mounted_include_inactive(tmp_path, monkeypatch, capsys) -> None:
     monkeypatch.setattr(ccb_mounted, "can_connect_localhost", lambda: True)
     monkeypatch.setattr(ccb_mounted, "pane_alive_for_session", lambda _data: None)
 
-    monkeypatch.setattr(ccb_mounted.sys, "argv", ["ccb-mounted", str(work_dir), "--json", "--include-inactive"])
+    monkeypatch.setattr(ccb_mounted.sys, "argv", ["cq-mounted", str(work_dir), "--json", "--include-inactive"])
     ccb_mounted.main()
 
     out = capsys.readouterr().out.strip()
@@ -69,7 +69,7 @@ def test_ccb_mounted_missing_active_treated_as_active(tmp_path, monkeypatch, cap
     monkeypatch.setattr(ccb_mounted, "can_connect_localhost", lambda: True)
     monkeypatch.setattr(ccb_mounted, "pane_alive_for_session", lambda _data: None)
 
-    monkeypatch.setattr(ccb_mounted.sys, "argv", ["ccb-mounted", str(work_dir), "--json"])
+    monkeypatch.setattr(ccb_mounted.sys, "argv", ["cq-mounted", str(work_dir), "--json"])
     ccb_mounted.main()
 
     out = capsys.readouterr().out.strip()
@@ -90,7 +90,7 @@ def test_ccb_mounted_malformed_json_treated_as_active(tmp_path, monkeypatch, cap
     monkeypatch.setattr(ccb_mounted, "can_connect_localhost", lambda: True)
     monkeypatch.setattr(ccb_mounted, "pane_alive_for_session", lambda _data: None)
 
-    monkeypatch.setattr(ccb_mounted.sys, "argv", ["ccb-mounted", str(work_dir), "--json"])
+    monkeypatch.setattr(ccb_mounted.sys, "argv", ["cq-mounted", str(work_dir), "--json"])
     ccb_mounted.main()
 
     out = capsys.readouterr().out.strip()
@@ -111,7 +111,7 @@ def test_ccb_mounted_active_null_treated_as_active(tmp_path, monkeypatch, capsys
     monkeypatch.setattr(ccb_mounted, "can_connect_localhost", lambda: True)
     monkeypatch.setattr(ccb_mounted, "pane_alive_for_session", lambda _data: None)
 
-    monkeypatch.setattr(ccb_mounted.sys, "argv", ["ccb-mounted", str(work_dir), "--json"])
+    monkeypatch.setattr(ccb_mounted.sys, "argv", ["cq-mounted", str(work_dir), "--json"])
     ccb_mounted.main()
 
     out = capsys.readouterr().out.strip()

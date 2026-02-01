@@ -17,15 +17,15 @@ From `$ARGUMENTS`:
 
 Run:
 ```bash
-ccb-mounted
+cq-mounted || ccb-mounted
 ```
 
-If `ccb-mounted` succeeds and returns a `mounted[]` list, define:
+If `cq-mounted` succeeds (or `ccb-mounted` succeeds) and returns a `mounted[]` list, define:
 - For this skill, `{self} = claude`
 - `reviewers = mounted - {self}` (skip yourself)
 - If `reviewers=...` is provided, use `reviewers = (mounted ∩ requested_reviewers) - {self}`
 
-If `ccb-mounted` fails (non-zero) or returns invalid/empty output:
+If `cq-mounted` (and `ccb-mounted`) fails (non-zero) or returns invalid/empty output:
 - If `reviewers=...` is provided, use `reviewers = requested_reviewers - {self}`
 - Otherwise proceed solo
 

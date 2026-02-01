@@ -1,6 +1,6 @@
 <div align="center">
 
-# Claude Code Bridge (`ccb`)
+# Code Quorum (`cq`)
 
 Split-pane collaboration between **Claude** and **Codex** using **tmux** or **WezTerm**.
 
@@ -16,11 +16,13 @@ Split-pane collaboration between **Claude** and **Codex** using **tmux** or **We
 
 ## What it does
 
-- `ccb` starts **Claude** and/or **Codex** in separate panes and writes per-project session files under `.ccb_config/`.
+- `cq` starts **Claude** and/or **Codex** in separate panes and writes per-project session files under `.ccb_config/`.
 - `ask` sends a message directly to the target pane (send-only, always async).
 - Replies come back **in the pane** via `ask --reply-to ...` (bidirectional “reply-via-ask”).
 
 No log tailing/monitoring is required or used.
+
+Compatibility: the legacy `ccb` / `ccb-mounted` commands still work as aliases.
 
 ---
 
@@ -28,7 +30,7 @@ No log tailing/monitoring is required or used.
 
 - Python **3.10+**
 - Either:
-  - tmux (run `tmux` first, then run `ccb` inside tmux), or
+  - tmux (run `tmux` first, then run `cq` inside tmux), or
   - WezTerm (recommended)
 - The `claude` CLI and the `codex` CLI installed and on `PATH`
 
@@ -44,7 +46,7 @@ From a repo checkout:
 
 This installs:
 - executables into `~/.local/bin` (or `$CODEX_BIN_DIR`)
-- project files into `~/.local/share/codex-dual` (or `$CODEX_INSTALL_PREFIX`)
+- project files into `~/.local/share/code-quorum` (or `$CODEX_INSTALL_PREFIX`)
 - skills into `~/.claude/skills` and `${CODEX_HOME:-~/.codex}/skills`
 
 Uninstall:
@@ -61,7 +63,7 @@ From your project directory (must contain `.ccb_config/`):
 
 ```bash
 mkdir -p .ccb_config
-ccb codex,claude
+cq codex,claude
 ```
 
 Send a message to a provider:
@@ -114,7 +116,7 @@ By default, `ask` resolves sessions **only** for the current project via `.ccb_c
 To check what is currently mounted:
 
 ```bash
-ccb-mounted --json
+cq-mounted --json
 ```
 
 ---
@@ -122,6 +124,6 @@ ccb-mounted --json
 ## Development
 
 ```bash
-python -m compileall -q lib bin ccb test
+python -m compileall -q lib bin ccb cq test
 python -m pytest test/ -v --tb=short
 ```

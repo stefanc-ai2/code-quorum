@@ -62,7 +62,7 @@ def _load_session(provider: str, *, work_dir: Path, session_file: Path | None) -
         session = load_claude_session(work_dir)
 
     if not session:
-        return None, f"No active {provider} session found for this directory. Run `ccb {provider}` first."
+        return None, f"No active {provider} session found for this directory. Run `cq {provider}` first. (Alias: `ccb {provider}`)"
 
     if _is_inactive(getattr(session, "data", {})):
         return None, f"Session is inactive: {getattr(session, 'session_file', '')}"

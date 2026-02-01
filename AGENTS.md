@@ -2,19 +2,20 @@
 
 ## Project Structure & Module Organization
 
-- `ccb`: primary CLI entrypoint (launcher/orchestrator).
+- `cq`: primary CLI entrypoint (launcher/orchestrator).
+- `ccb`: compatibility wrapper (for legacy workflows).
 - `lib/`: Python implementation (terminal backends, protocol markers, config/session utilities).
-- `bin/`: small CLI tools and wrappers (e.g. `ask`, `ping`, `ccb-mounted`).
+- `bin/`: small CLI tools and wrappers (e.g. `ask`, `ping`, `cq-mounted`, `ccb-mounted`).
 - `test/`: `pytest` suite (+ a few `test/system_*.sh` scripts).
 - `claude_skills/`, `codex_skills/`: provider skill bundles installed by `install.sh`.
 
 ## Build, Test, and Development Commands
 
-- `python -m compileall -q lib bin ccb`: fast syntax/type-syntax sanity check (matches CI).
+- `python -m compileall -q lib bin ccb cq`: fast syntax/type-syntax sanity check (matches CI).
 - `python -m pip install -U pip pytest`: install test runner.
 - `python -m pytest test/ -v --tb=short`: run the full test suite locally.
 - `./install.sh install` / `./install.sh uninstall`: install or remove local commands (see env vars in `install.sh` header).
-- `./ccb -h`: run the launcher from the repo checkout (no install required).
+- `./cq -h`: run the launcher from the repo checkout (no install required). (`./ccb -h` works too.)
 
 ## Coding Style & Naming Conventions
 
