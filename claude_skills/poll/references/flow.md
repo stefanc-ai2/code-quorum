@@ -29,9 +29,9 @@ If `cq-mounted` fails (non-zero) or returns invalid/empty output:
 
 If `respondents` is empty, proceed solo: answer the question yourself and clearly label it as a solo response.
 
-Generate a fresh correlation id (32-hex) you can match against later. Use it as the `req_id` for all broadcast `ask` calls:
-- `POLL_ID = <32-hex id>` (example: `66094bea382bbce94019e3ea9218ac81`)
-  - Generate: `POLL_ID="$(python -c 'import secrets; print(secrets.token_hex(16))')"`
+Generate a fresh request id (32-hex) you can match against later. Use it as the `req_id` for all broadcast `ask` calls (the `CQ_REQ_ID: ...` line at the top of each prompt):
+- `CQ_REQ_ID = <32-hex id>` (example: `66094bea382bbce94019e3ea9218ac81`)
+  - Generate: `CQ_REQ_ID="$(python -c 'import secrets; print(secrets.token_hex(16))')"`
 
 ## Step 1: Clarify if needed
 
@@ -50,15 +50,12 @@ Template:
 You are responding to a multi-provider poll. Provide an answer only — do not invoke `/poll`, `/pair`, or `/all-plan`, and do not implement changes.
 
 When you're done, send your answer back to the poll driver via reply-via-ask:
-1) Copy the `CQ_REQ_ID: ...` line at the top of this message
+1) Copy the `CQ_REQ_ID: ...` line at the top of this message (added automatically by `ask`)
 2) Run:
-   ask claude --reply-to <CQ_REQ_ID> --caller <your provider> <<'EOF'
-   <your answer>
-   EOF
+	   ask claude --reply-to <CQ_REQ_ID> --caller <your provider> <<'EOF'
+	   <your answer>
+	   EOF
 Do not reply in your own pane; send your answer via `ask --reply-to` so it arrives in the driver's pane.
-
-POLL_ID:
-<paste id>
 
 Question:
 <paste question>
@@ -71,7 +68,7 @@ Reply with:
 
 Then run, once per respondent (sequentially; pause ~1s between providers):
 ```bash
-ask <provider> --req-id "$POLL_ID" <<'EOF'
+ask <provider> --req-id "$CQ_REQ_ID" <<'EOF'
 <message>
 EOF
 ```
@@ -92,7 +89,7 @@ Do not send your driver answer to respondents; broadcast only the question.
 Respondents send answers back to your pane via `ask --reply-to ... --caller <provider>`.
 
 Each reply payload should include:
-- `CQ_REPLY: <POLL_ID>`
+- `CQ_REPLY: <CQ_REQ_ID>`
 - `CQ_FROM: <provider>`
 
 This flow is **multi-turn**. To collect replies: end your turn (do not run additional commands). Respondents will send messages back to your terminal (driver pane) via `ask --reply-to`.
@@ -121,7 +118,7 @@ Use the requested format (default: `consensus`).
 ```
 ## Poll Results
 
-**POLL_ID:** <id>
+**CQ_REQ_ID:** <id>
 **Question:** <question>
 **Driver:** claude
 **Respondents asked:** <list>
