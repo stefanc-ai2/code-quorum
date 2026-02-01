@@ -6,8 +6,6 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 Code Quorum (`cq`) is a split-pane collaboration tool for **Claude** and **Codex**.
 
-Compatibility: legacy `ccb` / `ccb-mounted` are kept as aliases during transition.
-
 Current design constraints:
 - Providers: `claude`, `codex` only
 - Platforms: macOS/Linux only
@@ -21,7 +19,7 @@ Current design constraints:
 
 ```bash
 # Syntax check
-python -m compileall -q lib bin ccb cq test
+python -m compileall -q lib bin cq test
 
 # Run all tests
 python -m pytest test/ -v --tb=short
@@ -34,22 +32,21 @@ TERM=xterm-256color python -m pytest test/ -v --tb=short
 
 ### Entry points
 
-- `cq`: launcher/orchestrator (starts panes, writes `.ccb_config/.{provider}-session`)
+- `cq`: launcher/orchestrator (starts panes, writes `.cq_config/.{provider}-session`)
 - `bin/ask`: send-only message delivery into a provider pane (async; prints req_id)
 - `bin/ping`: provider connectivity check
 - `bin/cq-mounted`: report mounted providers for the current directory
-- `ccb` / `bin/ccb-mounted`: legacy compatibility wrappers
 
 ### Key modules
 
 - `lib/terminal.py`: terminal backend abstraction (`TmuxBackend`, `WeztermBackend`)
 - `lib/*_session.py`: loads per-project session bindings and ensures pane liveness
-- `lib/ccb_protocol.py`: protocol markers (`CCB_REQ_ID`, `CCB_REPLY`, `CCB_FROM`) + wrapping helpers
+- `lib/cq_protocol.py`: protocol markers (`CQ_REQ_ID`, `CQ_REPLY`, `CQ_FROM`) + wrapping helpers
 - `lib/project_id.py`, `lib/session_utils.py`, `lib/session_registry.py`: project isolation and session lookup
 
 ### Session isolation
 
-Session resolution is scoped to the current project via `.ccb_config/`.
+Session resolution is scoped to the current project via `.cq_config/`.
 This enables running multiple repositories (repo A and repo B) without cross-talk.
 
 ## Beads (Issue Tracking)

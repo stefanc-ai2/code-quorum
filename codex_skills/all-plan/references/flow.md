@@ -20,7 +20,7 @@ From `$ARGUMENTS`:
 
 Run:
 ```bash
-cq-mounted || ccb-mounted
+cq-mounted
 ```
 
 This returns JSON like:
@@ -454,7 +454,7 @@ Incorporate Claude's final feedback and create the complete solution design.
 
 Write the final plan to a markdown file:
 
-**File path**: `.ccb_config/plans/{feature-name}-plan.md`
+**File path**: `.cq_config/plans/{feature-name}-plan.md`
 
 Use this template:
 
@@ -583,7 +583,7 @@ After saving the file, display to user:
 PLAN COMPLETE
 =============
 
-✓ Plan saved to: .ccb_config/plans/{feature-name}-plan.md
+✓ Plan saved to: .cq_config/plans/{feature-name}-plan.md
 
 Summary:
 - Goal: [1-sentence goal]
@@ -617,6 +617,6 @@ Next: Review the plan and proceed with implementation when ready.
 - This skill is designed for complex features or architectural decisions
 - For simple tasks, use dual-design or direct implementation instead
 - This flow is multi-turn: dispatch via `ask`, then continue once reply-via-ask results arrive in-pane
-- **CRITICAL**: Always run `cq-mounted` (or `ccb-mounted`) first to detect which providers are active. Only dispatch to providers in the `mounted` array
+- **CRITICAL**: Always run `cq-mounted` first to detect which providers are active. Only dispatch to providers in the `mounted` array
 - If only Codex and Claude are mounted, the collaboration will be between those two only
-- Plans are saved to `.ccb_config/plans/` with descriptive filenames
+- Plans are saved to `.cq_config/plans/` with descriptive filenames

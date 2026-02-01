@@ -8,11 +8,11 @@ from pathlib import Path
 from typing import Tuple, Optional
 
 
-CCB_PROJECT_CONFIG_DIRNAME = ".ccb_config"
+CQ_PROJECT_CONFIG_DIRNAME = ".cq_config"
 
 
 def project_config_dir(work_dir: Path) -> Path:
-    return Path(work_dir).resolve() / CCB_PROJECT_CONFIG_DIRNAME
+    return Path(work_dir).resolve() / CQ_PROJECT_CONFIG_DIRNAME
 
 
 def check_session_writable(session_file: Path) -> Tuple[bool, Optional[str], Optional[str]]:
@@ -138,11 +138,11 @@ def find_project_session_file(work_dir: Path, session_filename: str) -> Optional
     Find a session file for the given work_dir.
 
     Lookup is local-only (no upward traversal):
-      1) <work_dir>/.ccb_config/<session_filename>
+      1) <work_dir>/.cq_config/<session_filename>
       2) <work_dir>/<session_filename>  (legacy)
     """
     current = Path(work_dir).resolve()
-    candidate = current / CCB_PROJECT_CONFIG_DIRNAME / session_filename
+    candidate = current / CQ_PROJECT_CONFIG_DIRNAME / session_filename
     if candidate.exists():
         return candidate
     legacy = current / session_filename

@@ -4,13 +4,13 @@ import compat
 
 
 def test_decode_stdin_bytes_decodes_utf8(monkeypatch) -> None:
-    monkeypatch.delenv("CCB_STDIN_ENCODING", raising=False)
+    monkeypatch.delenv("CQ_STDIN_ENCODING", raising=False)
     raw = "你好".encode("utf-8")
     assert compat.decode_stdin_bytes(raw) == "你好"
 
 
 def test_decode_stdin_bytes_honors_forced_encoding(monkeypatch) -> None:
-    monkeypatch.setenv("CCB_STDIN_ENCODING", "latin-1")
+    monkeypatch.setenv("CQ_STDIN_ENCODING", "latin-1")
     raw = "caf\xe9".encode("latin-1")
     assert compat.decode_stdin_bytes(raw) == "café"
 

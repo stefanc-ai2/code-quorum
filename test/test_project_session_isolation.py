@@ -9,7 +9,7 @@ import pytest
 import session_registry
 from codex_session import load_project_session as load_codex_session
 from claude_session import load_project_session as load_claude_session
-from project_id import compute_ccb_project_id
+from project_id import compute_cq_project_id
 
 
 class _AliveBackend:
@@ -18,7 +18,7 @@ class _AliveBackend:
 
 
 def _write_registry_record(*, home: Path, session_id: str, record: dict) -> None:
-    run_dir = home / ".ccb" / "run"
+    run_dir = home / ".cq" / "run"
     run_dir.mkdir(parents=True, exist_ok=True)
     path = run_dir / f"{session_registry.REGISTRY_PREFIX}{session_id}{session_registry.REGISTRY_SUFFIX}"
     path.write_text(json.dumps(record, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -28,15 +28,15 @@ def test_claude_session_isolated_from_env_cross_project(tmp_path: Path, monkeypa
     home = tmp_path / "home"
     home.mkdir(parents=True, exist_ok=True)
     monkeypatch.setenv("HOME", str(home))
-    monkeypatch.delenv("CCB_ALLOW_CROSS_PROJECT_SESSION", raising=False)
+    monkeypatch.delenv("CQ_ALLOW_CROSS_PROJECT_SESSION", raising=False)
 
     repo_a = tmp_path / "repo_a"
     repo_b = tmp_path / "repo_b"
-    (repo_a / ".ccb_config").mkdir(parents=True, exist_ok=True)
-    (repo_b / ".ccb_config").mkdir(parents=True, exist_ok=True)
+    (repo_a / ".cq_config").mkdir(parents=True, exist_ok=True)
+    (repo_b / ".cq_config").mkdir(parents=True, exist_ok=True)
 
-    pid_a = compute_ccb_project_id(repo_a)
-    pid_b = compute_ccb_project_id(repo_b)
+    pid_a = compute_cq_project_id(repo_a)
+    pid_b = compute_cq_project_id(repo_b)
 
     # Avoid tmux/wezterm dependencies in registry scans.
     monkeypatch.setattr(session_registry, "get_backend_for_session", lambda _data: _AliveBackend())
@@ -49,8 +49,8 @@ def test_claude_session_isolated_from_env_cross_project(tmp_path: Path, monkeypa
         home=home,
         session_id=session_a,
         record={
-            "ccb_session_id": session_a,
-            "ccb_project_id": pid_a,
+            "cq_session_id": session_a,
+            "cq_project_id": pid_a,
             "work_dir": str(repo_a),
             "terminal": "tmux",
             "providers": {"claude": {"pane_id": "%a"}},
@@ -61,8 +61,8 @@ def test_claude_session_isolated_from_env_cross_project(tmp_path: Path, monkeypa
         home=home,
         session_id=session_b,
         record={
-            "ccb_session_id": session_b,
-            "ccb_project_id": pid_b,
+            "cq_session_id": session_b,
+            "cq_project_id": pid_b,
             "work_dir": str(repo_b),
             "terminal": "tmux",
             "providers": {"claude": {"pane_id": "%b"}},
@@ -71,7 +71,7 @@ def test_claude_session_isolated_from_env_cross_project(tmp_path: Path, monkeypa
     )
 
     # Point env at repo_b, but resolve from repo_a.
-    monkeypatch.setenv("CCB_SESSION_ID", session_b)
+    monkeypatch.setenv("CQ_SESSION_ID", session_b)
     monkeypatch.delenv("CODEX_SESSION_ID", raising=False)
     monkeypatch.delenv("GEMINI_SESSION_ID", raising=False)
     monkeypatch.delenv("OPENCODE_SESSION_ID", raising=False)
@@ -79,22 +79,22 @@ def test_claude_session_isolated_from_env_cross_project(tmp_path: Path, monkeypa
     session = load_claude_session(repo_a)
     assert session is not None
     assert Path(session.work_dir).resolve() == repo_a.resolve()
-    assert session.data.get("ccb_project_id") == pid_a
+    assert session.data.get("cq_project_id") == pid_a
 
 
 def test_claude_session_allow_cross_project_when_enabled(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     home = tmp_path / "home"
     home.mkdir(parents=True, exist_ok=True)
     monkeypatch.setenv("HOME", str(home))
-    monkeypatch.setenv("CCB_ALLOW_CROSS_PROJECT_SESSION", "1")
+    monkeypatch.setenv("CQ_ALLOW_CROSS_PROJECT_SESSION", "1")
 
     repo_a = tmp_path / "repo_a"
     repo_b = tmp_path / "repo_b"
-    (repo_a / ".ccb_config").mkdir(parents=True, exist_ok=True)
-    (repo_b / ".ccb_config").mkdir(parents=True, exist_ok=True)
+    (repo_a / ".cq_config").mkdir(parents=True, exist_ok=True)
+    (repo_b / ".cq_config").mkdir(parents=True, exist_ok=True)
 
-    pid_a = compute_ccb_project_id(repo_a)
-    pid_b = compute_ccb_project_id(repo_b)
+    pid_a = compute_cq_project_id(repo_a)
+    pid_b = compute_cq_project_id(repo_b)
 
     monkeypatch.setattr(session_registry, "get_backend_for_session", lambda _data: _AliveBackend())
 
@@ -105,8 +105,8 @@ def test_claude_session_allow_cross_project_when_enabled(tmp_path: Path, monkeyp
         home=home,
         session_id=session_a,
         record={
-            "ccb_session_id": session_a,
-            "ccb_project_id": pid_a,
+            "cq_session_id": session_a,
+            "cq_project_id": pid_a,
             "work_dir": str(repo_a),
             "terminal": "tmux",
             "providers": {"claude": {"pane_id": "%a"}},
@@ -117,8 +117,8 @@ def test_claude_session_allow_cross_project_when_enabled(tmp_path: Path, monkeyp
         home=home,
         session_id=session_b,
         record={
-            "ccb_session_id": session_b,
-            "ccb_project_id": pid_b,
+            "cq_session_id": session_b,
+            "cq_project_id": pid_b,
             "work_dir": str(repo_b),
             "terminal": "tmux",
             "providers": {"claude": {"pane_id": "%b"}},
@@ -126,7 +126,7 @@ def test_claude_session_allow_cross_project_when_enabled(tmp_path: Path, monkeyp
         },
     )
 
-    monkeypatch.setenv("CCB_SESSION_ID", session_b)
+    monkeypatch.setenv("CQ_SESSION_ID", session_b)
     monkeypatch.delenv("CODEX_SESSION_ID", raising=False)
     monkeypatch.delenv("GEMINI_SESSION_ID", raising=False)
     monkeypatch.delenv("OPENCODE_SESSION_ID", raising=False)
@@ -134,14 +134,14 @@ def test_claude_session_allow_cross_project_when_enabled(tmp_path: Path, monkeyp
     session = load_claude_session(repo_a)
     assert session is not None
     assert Path(session.work_dir).resolve() == repo_b.resolve()
-    assert session.data.get("ccb_project_id") == pid_b
+    assert session.data.get("cq_project_id") == pid_b
 
 
 def test_codex_session_loaded_only_from_current_directory(tmp_path: Path) -> None:
     repo_a = tmp_path / "repo_a"
     repo_b = tmp_path / "repo_b"
-    cfg_a = repo_a / ".ccb_config"
-    cfg_b = repo_b / ".ccb_config"
+    cfg_a = repo_a / ".cq_config"
+    cfg_b = repo_b / ".cq_config"
     cfg_a.mkdir(parents=True, exist_ok=True)
     cfg_b.mkdir(parents=True, exist_ok=True)
 

@@ -8,7 +8,7 @@ agent=""
 
 if [[ "$arg" == %* ]]; then
   pane_id="$arg"
-  agent="$(tmux display-message -p -t "$pane_id" "#{@ccb_agent}" 2>/dev/null | tr -d '\r')"
+  agent="$(tmux display-message -p -t "$pane_id" "#{@cq_agent}" 2>/dev/null | tr -d '\r')"
   title="$(tmux display-message -p -t "$pane_id" "#{pane_title}" 2>/dev/null | tr -d '\r')"
 else
   title="$arg"
@@ -48,14 +48,8 @@ case "$key" in
         ;;
     *)
         case "$title" in
-            CCB-Codex*)
-                set_border "fg=#ff9e64,bold"
-                ;;
             CQ-Codex*)
                 set_border "fg=#ff9e64,bold"
-                ;;
-            CCB-Gemini*)
-                set_border "fg=#7dcfff,bold"
                 ;;
             CQ-Gemini*)
                 set_border "fg=#7dcfff,bold"
@@ -63,20 +57,11 @@ case "$key" in
             Claude*)
                 set_border "fg=#bb9af7,bold"
                 ;;
-            CCB-OpenCode*)
-                set_border "fg=#9ece6a,bold"
-                ;;
             CQ-OpenCode*)
                 set_border "fg=#9ece6a,bold"
                 ;;
-            CCB-Droid*)
-                set_border "fg=#e0af68,bold"
-                ;;
             CQ-Droid*)
                 set_border "fg=#e0af68,bold"
-                ;;
-            CCB-Cmd*)
-                set_border "fg=#7dcfff,bold"
                 ;;
             CQ-Cmd*)
                 set_border "fg=#7dcfff,bold"

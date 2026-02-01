@@ -21,7 +21,7 @@ def test_respawn_pane_builds_command_and_sets_remain(monkeypatch: pytest.MonkeyP
         "%9",
         cmd="echo hi",
         cwd="/tmp",
-        stderr_log_path="/tmp/ccb/stderr.log",
+        stderr_log_path="/tmp/cq/stderr.log",
         remain_on_exit=True,
     )
 

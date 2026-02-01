@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import re
 
-from ccb_protocol import REQ_ID_PREFIX, make_req_id, wrap_request_prompt
-from ccb_protocol import FROM_PREFIX, REPLY_PREFIX, wrap_reply_payload
-from ccb_protocol import strip_trailing_markers
+from cq_protocol import REQ_ID_PREFIX, make_req_id, wrap_request_prompt
+from cq_protocol import FROM_PREFIX, REPLY_PREFIX, wrap_reply_payload
+from cq_protocol import strip_trailing_markers
 
 
 def test_make_req_id_format_and_uniqueness() -> None:
@@ -34,5 +34,5 @@ def test_strip_trailing_markers_removes_harness_trailers() -> None:
 def test_wrap_reply_payload_structure() -> None:
     payload = wrap_reply_payload(reply_to_req_id="abc123", from_provider="codex", message="hello\nworld")
     assert payload.startswith(f"{REPLY_PREFIX} abc123\n{FROM_PREFIX} codex\n")
-    assert "[CCB_RESULT] No reply required.\n\n" in payload
+    assert "[CQ_RESULT] No reply required.\n\n" in payload
     assert payload.endswith("hello\nworld\n")

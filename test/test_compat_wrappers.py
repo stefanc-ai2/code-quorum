@@ -18,12 +18,12 @@ def _read_version_from_cq(repo_root: Path) -> str:
     return m.group(1)
 
 
-def test_ccb_wrapper_print_version() -> None:
+def test_cq_print_version() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     expected = _read_version_from_cq(repo_root)
 
     result = subprocess.run(
-        [sys.executable, str(repo_root / "ccb"), "--print-version"],
+        [sys.executable, str(repo_root / "cq"), "--print-version"],
         capture_output=True,
         text=True,
     )
@@ -31,19 +31,19 @@ def test_ccb_wrapper_print_version() -> None:
     assert result.stdout.strip() == f"v{expected}"
 
 
-def test_ccb_mounted_wrapper_reports_session(tmp_path: Path) -> None:
+def test_cq_mounted_reports_session(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parents[1]
 
     work_dir = tmp_path / "repo"
-    (work_dir / ".ccb_config").mkdir(parents=True, exist_ok=True)
-    (work_dir / ".ccb_config" / ".codex-session").write_text(
+    (work_dir / ".cq_config").mkdir(parents=True, exist_ok=True)
+    (work_dir / ".cq_config" / ".codex-session").write_text(
         json.dumps({}), encoding="utf-8"
     )
 
     result = subprocess.run(
         [
             sys.executable,
-            str(repo_root / "bin" / "ccb-mounted"),
+            str(repo_root / "bin" / "cq-mounted"),
             str(work_dir),
             "--json",
         ],

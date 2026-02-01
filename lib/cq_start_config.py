@@ -7,7 +7,7 @@ import re
 from typing import Optional, Tuple
 
 
-CONFIG_FILENAME = "ccb.config"
+CONFIG_FILENAME = "cq.config"
 DEFAULT_PROVIDERS = ["codex", "claude"]
 
 
@@ -117,8 +117,8 @@ def _read_config(path: Path) -> dict:
 
 
 def _config_paths(work_dir: Path) -> Tuple[Path, Path]:
-    project = Path(work_dir) / ".ccb_config" / CONFIG_FILENAME
-    global_path = Path.home() / ".ccb" / CONFIG_FILENAME
+    project = Path(work_dir) / ".cq_config" / CONFIG_FILENAME
+    global_path = Path.home() / ".cq" / CONFIG_FILENAME
     return project, global_path
 
 

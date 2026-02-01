@@ -21,7 +21,7 @@ def decode_stdin_bytes(data: bytes) -> str:
     if data.startswith(b"\xfe\xff"):
         return data[2:].decode("utf-16be", errors="replace")
 
-    forced = (os.environ.get("CCB_STDIN_ENCODING") or "").strip()
+    forced = (os.environ.get("CQ_STDIN_ENCODING") or "").strip()
     if forced:
         return data.decode(forced, errors="replace")
     return data.decode("utf-8", errors="replace")

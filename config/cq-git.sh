@@ -10,8 +10,7 @@ set -euo pipefail
 
 path="${1:-}"
 
-ttl_s_raw="${CCB_TMUX_GIT_TTL_S:-3}"
-ttl_s_raw="${CQ_TMUX_GIT_TTL_S:-$ttl_s_raw}"
+ttl_s_raw="${CQ_TMUX_GIT_TTL_S:-3}"
 ttl_s=3
 if [[ "$ttl_s_raw" =~ ^[0-9]+$ ]]; then
   ttl_s="$ttl_s_raw"
@@ -20,7 +19,7 @@ if (( ttl_s < 0 )); then
   ttl_s=0
 fi
 
-cache_root="${XDG_CACHE_HOME:-$HOME/.cache}/ccb"
+cache_root="${XDG_CACHE_HOME:-$HOME/.cache}/cq"
 mkdir -p "$cache_root" 2>/dev/null || true
 
 key="$(printf '%s' "$path" | cksum | awk '{print $1}' 2>/dev/null || echo 0)"

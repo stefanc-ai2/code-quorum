@@ -22,7 +22,7 @@ def _load_cq_module() -> object:
 def test_run_up_sorts_providers_in_tmux(monkeypatch, tmp_path: Path) -> None:
     cq = _load_cq_module()
     monkeypatch.chdir(tmp_path)
-    (tmp_path / ".ccb_config").mkdir(parents=True, exist_ok=True)
+    (tmp_path / ".cq_config").mkdir(parents=True, exist_ok=True)
     monkeypatch.setenv("TMUX_PANE", "%0")
     monkeypatch.setattr(cq, "detect_terminal", lambda: "tmux")
 
@@ -50,7 +50,7 @@ def test_run_up_sorts_providers_in_tmux(monkeypatch, tmp_path: Path) -> None:
 def test_start_codex_tmux_writes_session_file(monkeypatch, tmp_path: Path) -> None:
     cq = _load_cq_module()
     monkeypatch.chdir(tmp_path)
-    (tmp_path / ".ccb_config").mkdir(parents=True, exist_ok=True)
+    (tmp_path / ".cq_config").mkdir(parents=True, exist_ok=True)
     monkeypatch.setenv("TMUX_PANE", "%0")
 
     # Ensure runtime dir lands under tmp_path.
@@ -110,7 +110,7 @@ def test_start_codex_tmux_writes_session_file(monkeypatch, tmp_path: Path) -> No
     assert (runtime / "codex.pid").exists()
     assert (runtime / "codex.pid").read_text(encoding="utf-8").strip() == "12345"
 
-    session_file = tmp_path / ".ccb_config" / ".codex-session"
+    session_file = tmp_path / ".cq_config" / ".codex-session"
     data = cq.json.loads(session_file.read_text(encoding="utf-8"))
     assert data["pane_id"] == pane_id
     assert "input_fifo" not in data

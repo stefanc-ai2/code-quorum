@@ -2,11 +2,8 @@
 # CQ Status Bar Script for tmux
 # Shows active AI panes (tmux) and legacy daemon status.
 
-CQ_DIR="${CQ_DIR:-${CCB_DIR:-$HOME/.local/share/code-quorum}}"
-CCB_DIR="${CCB_DIR:-$CQ_DIR}"
-
-CQ_CACHE_DIR="${CQ_CACHE_DIR:-${CCB_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/code-quorum}}"
-CCB_CACHE_DIR="${CCB_CACHE_DIR:-$CQ_CACHE_DIR}"
+CQ_DIR="${CQ_DIR:-$HOME/.local/share/code-quorum}"
+CQ_CACHE_DIR="${CQ_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/cq}"
 TMP_DIR="${TMPDIR:-/tmp}"
 
 # Color codes for tmux status bar (Tokyo Night palette)
@@ -37,16 +34,16 @@ check_session() {
     local session_file
 
     case "$name" in
-        claude)  session_file="$PWD/.ccb_config/.claude-session" ;;
-        codex)   session_file="$PWD/.ccb_config/.codex-session" ;;
-        gemini)  session_file="$PWD/.ccb_config/.gemini-session" ;;
-        opencode) session_file="$PWD/.ccb_config/.opencode-session" ;;
-        droid)   session_file="$PWD/.ccb_config/.droid-session" ;;
+        claude)  session_file="$PWD/.cq_config/.claude-session" ;;
+        codex)   session_file="$PWD/.cq_config/.codex-session" ;;
+        gemini)  session_file="$PWD/.cq_config/.gemini-session" ;;
+        opencode) session_file="$PWD/.cq_config/.opencode-session" ;;
+        droid)   session_file="$PWD/.cq_config/.droid-session" ;;
     esac
 
     # Backwards compatibility: older versions stored session files in project root.
     if [[ -n "$session_file" && ! -f "$session_file" ]]; then
-        local legacy="${session_file/.ccb_config\\//}"
+        local legacy="${session_file/.cq_config\\//}"
         if [[ -f "$legacy" ]]; then
             session_file="$legacy"
         fi
@@ -62,7 +59,7 @@ check_session() {
 # Get queue depth for a daemon (if available)
 get_queue_depth() {
     local name="$1"
-    local queue_file="$TMP_DIR/ccb-${name}d.queue"
+    local queue_file="$TMP_DIR/cq-${name}d.queue"
 
     if [[ -f "$queue_file" ]]; then
         wc -l < "$queue_file" 2>/dev/null | tr -d ' '
@@ -90,10 +87,10 @@ format_ai_status() {
 # Main status output
 main() {
     local mode="${1:-full}"
-    local cache_s="${CQ_STATUS_CACHE_S:-${CCB_STATUS_CACHE_S:-1}}"
+    local cache_s="${CQ_STATUS_CACHE_S:-1}"
     local cache_key=""
     local cache_suffix="${cache_key:-default}"
-    local cache_file="$TMP_DIR/ccb-status.${mode}.${cache_suffix}.cache"
+    local cache_file="$TMP_DIR/cq-status.${mode}.${cache_suffix}.cache"
 
     # Simple cache to avoid hammering the system on frequent tmux redraws.
     if [[ "$cache_s" =~ ^[0-9]+$ ]] && (( cache_s > 0 )) && [[ -f "$cache_file" ]]; then
@@ -182,11 +179,11 @@ main() {
             pane_titles="$(tmux list-panes -a -F '#{pane_title}' 2>/dev/null || true)"
 
             local has_claude=0
-            if printf '%s\n' "$pane_titles" | grep -qE '^(CCB|CQ)-Claude'; then
+            if printf '%s\n' "$pane_titles" | grep -qE '^CQ-Claude'; then
                 has_claude=1
             fi
             local has_codex=0
-            if printf '%s\n' "$pane_titles" | grep -qE '^(CCB|CQ)-Codex'; then
+            if printf '%s\n' "$pane_titles" | grep -qE '^CQ-Codex'; then
                 has_codex=1
             fi
 
@@ -233,10 +230,8 @@ main() {
             local pane_title="${TMUX_PANE_TITLE:-}"
             local pane_title_lc
             pane_title_lc="$(printf '%s' "$pane_title" | tr '[:upper:]' '[:lower:]')"
-            if [[ "$pane_title_lc" == ccb-* || "$pane_title_lc" == cq-* ]]; then
-                local ai_name="${pane_title#CCB-}"
-                ai_name="${ai_name#ccb-}"
-                ai_name="${ai_name#CQ-}"
+            if [[ "$pane_title_lc" == cq-* ]]; then
+                local ai_name="${pane_title#CQ-}"
                 ai_name="${ai_name#cq-}"
                 local ai_key
                 ai_key="$(printf '%s' "$ai_name" | tr '[:upper:]' '[:lower:]')"

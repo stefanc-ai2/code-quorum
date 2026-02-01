@@ -3,9 +3,9 @@ from __future__ import annotations
 import re
 import secrets
 
-REQ_ID_PREFIX = "CCB_REQ_ID:"
-REPLY_PREFIX = "CCB_REPLY:"
-FROM_PREFIX = "CCB_FROM:"
+REQ_ID_PREFIX = "CQ_REQ_ID:"
+REPLY_PREFIX = "CQ_REPLY:"
+FROM_PREFIX = "CQ_FROM:"
 
 _TRAILING_DONE_TAG_RE = re.compile(
     r"^\s*[A-Z][A-Z0-9_]*_DONE(?:\s*:\s*(?:[0-9a-f]{32}|\d{8}-\d{6}-\d{3}-\d+))?\s*$"
@@ -43,7 +43,7 @@ def make_req_id() -> str:
 
 def wrap_request_prompt(message: str, req_id: str) -> str:
     """
-    Wrap a user message for a provider request that will be correlated by `CCB_REQ_ID`.
+    Wrap a user message for a provider request that will be correlated by `CQ_REQ_ID`.
 
     This wrapper intentionally does *not* include completion markers.
     Completion/correlation is handled via reply-via-ask (`ask --reply-to <req_id> ...`) in higher-level flows.
@@ -67,6 +67,6 @@ def wrap_reply_payload(
     return (
         f"{REPLY_PREFIX} {reply_to_req_id}\n"
         f"{FROM_PREFIX} {from_provider}\n"
-        "[CCB_RESULT] No reply required.\n\n"
+        "[CQ_RESULT] No reply required.\n\n"
         f"{message}\n"
     )

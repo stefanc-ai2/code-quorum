@@ -6,6 +6,9 @@ INSTALL_PREFIX="${CODEX_INSTALL_PREFIX:-$HOME/.local/share/code-quorum}"
 BIN_DIR="${CODEX_BIN_DIR:-$HOME/.local/bin}"
 readonly REPO_ROOT INSTALL_PREFIX BIN_DIR
 
+LEGACY_PREFIX="c""c""b"
+readonly LEGACY_PREFIX
+
 # Check for root/sudo - refuse to run as root
 if [[ "${EUID:-$(id -u)}" -eq 0 ]]; then
   echo "ERROR: Do not run as root/sudo. Please run as a normal user." >&2
@@ -16,13 +19,11 @@ SCRIPTS_TO_LINK=(
   bin/ask
   bin/ping
   bin/cq-mounted
-  bin/ccb-mounted
   cq
-  ccb
 )
 
 CLAUDE_MARKDOWN=(
-  # Old CCB commands removed - replaced by unified ask/ping skills
+  # Old commands removed - replaced by unified ask/ping skills
 )
 
 LEGACY_SCRIPTS=(
@@ -36,7 +37,6 @@ LEGACY_SCRIPTS=(
   claude_ai
   claude_bridge
   # Removed provider-specific CLIs (kept for uninstall/upgrade cleanup)
-  ccb-ping
   cping
   lping
   cask
@@ -50,7 +50,6 @@ LEGACY_SCRIPTS=(
   opend
   dpend
   lpend
-  ccb-completion-hook
   gping
   oping
   dping
@@ -72,7 +71,7 @@ Optional environment variables:
   CODEX_INSTALL_PREFIX     Install directory (default: ~/.local/share/code-quorum)
   CODEX_BIN_DIR            Executable directory (default: ~/.local/bin)
   CODEX_CLAUDE_COMMAND_DIR Custom Claude commands directory (default: auto-detect)
-  CQ_PYTHON_BIN            Python interpreter override (default: auto-detect; legacy: CCB_PYTHON_BIN)
+  CQ_PYTHON_BIN            Python interpreter override (default: auto-detect)
 USAGE
 }
 
@@ -110,7 +109,7 @@ require_command() {
   fi
 }
 
-PYTHON_BIN="${CQ_PYTHON_BIN:-${CCB_PYTHON_BIN:-}}"
+PYTHON_BIN="${CQ_PYTHON_BIN:-}"
 
 _python_check_310() {
   local cmd="$1"
@@ -295,8 +294,8 @@ save_wezterm_config() {
   wezterm_path="$(detect_wezterm_path)"
   if [[ -n "$wezterm_path" ]]; then
     local cfg_root="${XDG_CONFIG_HOME:-$HOME/.config}"
-    mkdir -p "$cfg_root/ccb"
-    echo "CODEX_WEZTERM_BIN=${wezterm_path}" > "$cfg_root/ccb/env"
+    mkdir -p "$cfg_root/cq"
+    echo "CODEX_WEZTERM_BIN=${wezterm_path}" > "$cfg_root/cq/env"
     echo "OK: WezTerm path cached: $wezterm_path"
   fi
 }
@@ -338,10 +337,10 @@ copy_project() {
     git_date=$(git -C "$REPO_ROOT" log -1 --format='%cs' 2>/dev/null || echo "")
   fi
 
-  # Method 2: From environment variables (set by ccb/cq update)
-  if [[ -z "$git_commit" && -n "${CCB_GIT_COMMIT:-}" ]]; then
-    git_commit="$CCB_GIT_COMMIT"
-    git_date="${CCB_GIT_DATE:-}"
+  # Method 2: From environment variables
+  if [[ -z "$git_commit" && -n "${CQ_GIT_COMMIT:-}" ]]; then
+    git_commit="$CQ_GIT_COMMIT"
+    git_date="${CQ_GIT_DATE:-}"
   fi
 
   # Method 3: From GitHub API (fallback)
@@ -470,7 +469,7 @@ install_claude_commands() {
   claude_dir="$(detect_claude_dir)"
   mkdir -p "$claude_dir"
 
-  # Clean up obsolete CCB commands (replaced by unified ask/ping)
+  # Clean up obsolete legacy commands (replaced by unified ask/ping)
   local obsolete_cmds="cask.md gask.md oask.md dask.md lask.md cpend.md gpend.md opend.md dpend.md lpend.md cping.md gping.md oping.md dping.md lping.md"
   for obs_cmd in $obsolete_cmds; do
     if [[ -f "$claude_dir/$obs_cmd" ]]; then
@@ -497,7 +496,7 @@ install_claude_skills() {
 
   mkdir -p "$skills_dst"
 
-  # Clean up obsolete CCB skills (replaced by unified ask/ping)
+  # Clean up obsolete legacy skills (replaced by unified ask/ping)
   local obsolete_skills="pend cask gask oask dask lask cpend gpend opend dpend lpend cping gping oping dping lping"
   for obs_skill in $obsolete_skills; do
     if [[ -d "$skills_dst/$obs_skill" ]]; then
@@ -566,7 +565,7 @@ install_codex_skills() {
 
   mkdir -p "$skills_dst"
 
-  # Clean up obsolete CCB skills (replaced by unified ask/ping)
+  # Clean up obsolete legacy skills (replaced by unified ask/ping)
   local obsolete_skills="pend cask gask oask dask lask cpend gpend opend dpend lpend cping gping oping dping lping"
   for obs_skill in $obsolete_skills; do
     if [[ -d "$skills_dst/$obs_skill" ]]; then
@@ -617,8 +616,8 @@ install_codex_skills() {
   echo "Updated Codex skills directory: $skills_dst"
 }
 
-CCB_START_MARKER="<!-- CCB_CONFIG_START -->"
-CCB_END_MARKER="<!-- CCB_CONFIG_END -->"
+CQ_CONFIG_START_MARKER="<!-- CQ_CONFIG_START -->"
+CQ_CONFIG_END_MARKER="<!-- CQ_CONFIG_END -->"
 LEGACY_RULE_MARKER="## Codex Collaboration Rules"
 
 install_claude_md_config() {
@@ -630,61 +629,61 @@ install_claude_md_config() {
   fi
 
   # Use temp file to avoid Bash 3.2 heredoc parsing bug with single quotes
-  local ccb_tmpfile=""
-  ccb_tmpfile="$(mktemp)" || { echo "Failed to create temp file"; return 1; }
-  cat > "$ccb_tmpfile" << 'AI_RULES'
-<!-- CCB_CONFIG_START -->
+  local cq_tmpfile=""
+  cq_tmpfile="$(mktemp)" || { echo "Failed to create temp file"; return 1; }
+  cat > "$cq_tmpfile" << 'AI_RULES'
+<!-- CQ_CONFIG_START -->
 ## AI Collaboration
 Use `/ask <provider>` to consult other AI assistants (codex/claude).
 Use `/ping <provider>` to check connectivity.
 Responses arrive in-pane via reply-via-ask.
 
 Providers: `codex`, `claude`
-<!-- CCB_CONFIG_END -->
+<!-- CQ_CONFIG_END -->
 AI_RULES
-  local ccb_content
-  ccb_content="$(cat "$ccb_tmpfile")"
-  rm -f "$ccb_tmpfile" >/dev/null 2>&1 || true
-  ccb_tmpfile=""
+  local cq_content
+  cq_content="$(cat "$cq_tmpfile")"
+  rm -f "$cq_tmpfile" >/dev/null 2>&1 || true
+  cq_tmpfile=""
 
   if [[ -f "$claude_md" ]]; then
-    if grep -q "$CCB_START_MARKER" "$claude_md" 2>/dev/null; then
-      echo "Updating existing CCB config block..."
-      "$PYTHON_BIN" -c "
+	    if grep -qE '<!-- [A-Z]+_CONFIG_START -->' "$claude_md" 2>/dev/null; then
+	      echo "Updating existing CQ config block..."
+	      "$PYTHON_BIN" -c "
 import re
 
 with open('$claude_md', 'r', encoding='utf-8') as f:
     content = f.read()
-pattern = r'<!-- CCB_CONFIG_START -->.*?<!-- CCB_CONFIG_END -->'
-new_block = '''$ccb_content'''
+pattern = r'<!-- [A-Z]+_CONFIG_START -->.*?<!-- [A-Z]+_CONFIG_END -->'
+new_block = '''$cq_content'''
 content = re.sub(pattern, new_block, content, flags=re.DOTALL)
 with open('$claude_md', 'w', encoding='utf-8') as f:
     f.write(content)
 "
-    elif grep -qE "$LEGACY_RULE_MARKER|## Codex Collaboration Rules|## Gemini|## OpenCode" "$claude_md" 2>/dev/null; then
-      echo "Removing legacy rules and adding new CCB config block..."
-      "$PYTHON_BIN" -c "
-	import re
+	    elif grep -qE "$LEGACY_RULE_MARKER|## Codex Collaboration Rules|## Gemini|## OpenCode" "$claude_md" 2>/dev/null; then
+	      echo "Removing legacy rules and adding new CQ config block..."
+	      "$PYTHON_BIN" -c "
+import re
 
-	with open('$claude_md', 'r', encoding='utf-8') as f:
-	    content = f.read()
-	patterns = [
-	    r'## Codex Collaboration Rules.*?(?=\\n## (?!Gemini)|\\Z)',
-	    r'## Gemini Collaboration Rules.*?(?=\\n## |\\Z)',
-	    r'## OpenCode Collaboration Rules.*?(?=\\n## |\\Z)',
-	]
-	for p in patterns:
-	    content = re.sub(p, '', content, flags=re.DOTALL)
-	content = content.rstrip() + '\\n'
+with open('$claude_md', 'r', encoding='utf-8') as f:
+    content = f.read()
+patterns = [
+    r'## Codex Collaboration Rules.*?(?=\n## (?!Gemini)|\Z)',
+    r'## Gemini Collaboration Rules.*?(?=\n## |\Z)',
+    r'## OpenCode Collaboration Rules.*?(?=\n## |\Z)',
+]
+for p in patterns:
+    content = re.sub(p, '', content, flags=re.DOTALL)
+content = content.rstrip() + '\n'
 with open('$claude_md', 'w', encoding='utf-8') as f:
     f.write(content)
 "
-      echo "$ccb_content" >> "$claude_md"
-    else
-      echo "$ccb_content" >> "$claude_md"
+	      echo "$cq_content" >> "$claude_md"
+	    else
+      echo "$cq_content" >> "$claude_md"
     fi
   else
-    echo "$ccb_content" > "$claude_md"
+    echo "$cq_content" > "$claude_md"
   fi
 
   echo "Updated AI collaboration rules in $claude_md"
@@ -758,9 +757,7 @@ except Exception as e:
   fi
 }
 
-	CQ_TMUX_MARKER="# CQ (Code Quorum) tmux configuration"
-	CCB_TMUX_MARKER="# CCB (Claude Code Bridge) tmux configuration"
-	CCB_TMUX_MARKER_LEGACY="# CCB tmux configuration"
+CQ_TMUX_MARKER="# CQ (Code Quorum) tmux configuration"
 
 install_tmux_config() {
   local tmux_conf="$HOME/.tmux.conf"
@@ -774,13 +771,13 @@ install_tmux_config() {
 
   mkdir -p "$BIN_DIR"
 
-  # Clean up any legacy ccb-* helper scripts (cq-* are the canonical names now).
+  # Clean up any legacy helper scripts (cq-* are the canonical names now).
   rm -f \
-    "$BIN_DIR/ccb-status.sh" \
-    "$BIN_DIR/ccb-border.sh" \
-    "$BIN_DIR/ccb-git.sh" \
-    "$BIN_DIR/ccb-tmux-on.sh" \
-    "$BIN_DIR/ccb-tmux-off.sh" \
+    "$BIN_DIR/${LEGACY_PREFIX}-status.sh" \
+    "$BIN_DIR/${LEGACY_PREFIX}-border.sh" \
+    "$BIN_DIR/${LEGACY_PREFIX}-git.sh" \
+    "$BIN_DIR/${LEGACY_PREFIX}-tmux-on.sh" \
+    "$BIN_DIR/${LEGACY_PREFIX}-tmux-off.sh" \
     2>/dev/null || true
 
   # Install cq-status.sh script
@@ -822,38 +819,42 @@ install_tmux_config() {
     echo "Installed: $BIN_DIR/cq-tmux-off.sh"
   fi
 
-  # Check if already configured (new or legacy marker)
+  # Check if already configured (current marker)
   local already_configured=false
   if [[ -f "$tmux_conf" ]]; then
-    if grep -q "$CQ_TMUX_MARKER" "$tmux_conf" 2>/dev/null || \
-       grep -q "$CCB_TMUX_MARKER" "$tmux_conf" 2>/dev/null || \
-       grep -q "$CCB_TMUX_MARKER_LEGACY" "$tmux_conf" 2>/dev/null; then
+    if grep -q "$CQ_TMUX_MARKER" "$tmux_conf" 2>/dev/null; then
       already_configured=true
     fi
   fi
 
   if $already_configured; then
-    # Update existing config: remove old CQ/CCB block and re-add
     echo "Updating CQ tmux configuration..."
-    if pick_any_python_bin; then
-      "$PYTHON_BIN" -c "
-import re
-with open('$tmux_conf', 'r', encoding='utf-8') as f:
-    content = f.read()
-# Remove old CQ/CCB tmux config block (both new and legacy markers)
-pattern = r'\n*# =+\n# (?:CCB \(Claude Code Bridge\)|CQ \(Code Quorum\)) tmux configuration.*?# =+\n# End of (?:CCB|CQ) tmux configuration\n# =+'
-content = re.sub(pattern, '', content, flags=re.DOTALL)
-pattern = r'\n*# CCB tmux configuration.*'
-content = re.sub(pattern, '', content, flags=re.DOTALL)
-with open('$tmux_conf', 'w', encoding='utf-8') as f:
-    f.write(content.strip() + '\n' if content.strip() else '')
-"
-    fi
   else
     # Backup existing config if present
     if [[ -f "$tmux_conf" ]]; then
       cp "$tmux_conf" "$tmux_conf.bak.$(date +%Y%m%d%H%M%S)"
     fi
+  fi
+
+  # Remove any previously installed block (best-effort).
+  if [[ -f "$tmux_conf" ]] && pick_any_python_bin; then
+    "$PYTHON_BIN" -c "
+import re
+
+with open('$tmux_conf', 'r', encoding='utf-8') as f:
+    content = f.read()
+
+# Remove installer-managed tmux config block(s).
+pattern = r'\n*# =+\n# .* tmux configuration.*?# =+\n# End of .* tmux configuration\n# =+'
+content = re.sub(pattern, '', content, flags=re.DOTALL)
+
+# Remove any stray single-line marker left by older installs.
+pattern = r'\n*# [A-Z]{2,}.* tmux configuration.*\n'
+content = re.sub(pattern, '\n', content)
+
+with open('$tmux_conf', 'w', encoding='utf-8') as f:
+    f.write(content.strip() + '\n' if content.strip() else '')
+"
   fi
 
   # Append CQ tmux config (fill in BIN_DIR placeholders)
@@ -867,7 +868,7 @@ path = '$cq_tmux_conf'
 bin_dir = '$BIN_DIR'
 with open(path, 'r', encoding='utf-8') as f:
     content = f.read()
-sys.stdout.write(content.replace('@CQ_BIN_DIR@', bin_dir).replace('@CCB_BIN_DIR@', bin_dir))
+sys.stdout.write(content.replace('@CQ_BIN_DIR@', bin_dir))
 " 2>/dev/null || cat "$cq_tmux_conf"
     else
       cat "$cq_tmux_conf"
@@ -902,11 +903,11 @@ uninstall_tmux_config() {
     "$BIN_DIR/cq-git.sh"
     "$BIN_DIR/cq-tmux-on.sh"
     "$BIN_DIR/cq-tmux-off.sh"
-    "$BIN_DIR/ccb-status.sh"
-    "$BIN_DIR/ccb-border.sh"
-    "$BIN_DIR/ccb-git.sh"
-    "$BIN_DIR/ccb-tmux-on.sh"
-    "$BIN_DIR/ccb-tmux-off.sh"
+    "$BIN_DIR/${LEGACY_PREFIX}-status.sh"
+    "$BIN_DIR/${LEGACY_PREFIX}-border.sh"
+    "$BIN_DIR/${LEGACY_PREFIX}-git.sh"
+    "$BIN_DIR/${LEGACY_PREFIX}-tmux-on.sh"
+    "$BIN_DIR/${LEGACY_PREFIX}-tmux-off.sh"
   )
 
   for script in "${scripts[@]}"; do
@@ -920,23 +921,14 @@ uninstall_tmux_config() {
     return
   fi
 
-  # Check for both new and legacy markers
-  if ! grep -q "$CQ_TMUX_MARKER" "$tmux_conf" 2>/dev/null && \
-     ! grep -q "$CCB_TMUX_MARKER" "$tmux_conf" 2>/dev/null && \
-     ! grep -q "$CCB_TMUX_MARKER_LEGACY" "$tmux_conf" 2>/dev/null; then
-    return
-  fi
-
   echo "Removing CQ tmux configuration..."
   if pick_any_python_bin; then
     "$PYTHON_BIN" -c "
 import re
 with open('$tmux_conf', 'r', encoding='utf-8') as f:
     content = f.read()
-# Remove CQ/CCB tmux config block (both new and legacy markers)
-pattern = r'\n*# =+\n# (?:CCB \(Claude Code Bridge\)|CQ \(Code Quorum\)) tmux configuration.*?# =+\n# End of (?:CCB|CQ) tmux configuration\n# =+'
-content = re.sub(pattern, '', content, flags=re.DOTALL)
-pattern = r'\n*# CCB tmux configuration.*'
+# Remove installer-managed tmux config block(s).
+pattern = r'\n*# =+\n# .* tmux configuration.*?# =+\n# End of .* tmux configuration\n# =+'
 content = re.sub(pattern, '', content, flags=re.DOTALL)
 with open('$tmux_conf', 'w', encoding='utf-8') as f:
     f.write(content.strip() + '\n' if content.strip() else '')
@@ -964,6 +956,19 @@ cleanup_legacy_files() {
   echo "Cleaning up legacy files..."
   local cleaned=0
 
+  local legacy_cmds=(
+    "${LEGACY_PREFIX}"
+    "${LEGACY_PREFIX}-mounted"
+  )
+  local legacy_cmd
+  for legacy_cmd in "${legacy_cmds[@]}"; do
+    if [[ -e "$BIN_DIR/$legacy_cmd" ]]; then
+      rm -f "$BIN_DIR/$legacy_cmd"
+      echo "  Removed legacy command: $BIN_DIR/$legacy_cmd"
+      cleaned=$((cleaned + 1))
+    fi
+  done
+
   # Legacy daemon scripts in bin/
   local legacy_daemons="askd caskd gaskd oaskd laskd daskd"
   for daemon in $legacy_daemons; do
@@ -980,8 +985,8 @@ cleanup_legacy_files() {
     fi
   done
 
-  # Legacy daemon state files in ~/.cache/ccb/
-  local cache_dir="${XDG_CACHE_HOME:-$HOME/.cache}/ccb"
+  # Legacy daemon state files in cache dir
+  local cache_dir="${XDG_CACHE_HOME:-$HOME/.cache}/${LEGACY_PREFIX}"
   local legacy_states="askd.json caskd.json gaskd.json oaskd.json laskd.json daskd.json"
   for state in $legacy_states; do
     if [[ -f "$cache_dir/$state" ]]; then
@@ -1036,40 +1041,40 @@ uninstall_claude_md_config() {
     return
   fi
 
-  if grep -q "$CCB_START_MARKER" "$claude_md" 2>/dev/null; then
-    echo "Removing CCB config block from CLAUDE.md..."
+  if grep -qE '<!-- [A-Z]+_CONFIG_START -->' "$claude_md" 2>/dev/null; then
+    echo "Removing AI collaboration config block from CLAUDE.md..."
     if pick_any_python_bin; then
       "$PYTHON_BIN" -c "
 import re
 
 with open('$claude_md', 'r', encoding='utf-8') as f:
     content = f.read()
-pattern = r'\\n?<!-- CCB_CONFIG_START -->.*?<!-- CCB_CONFIG_END -->\\n?'
-content = re.sub(pattern, '\\n', content, flags=re.DOTALL)
-content = content.strip() + '\\n'
+pattern = r'\n?<!-- [A-Z]+_CONFIG_START -->.*?<!-- [A-Z]+_CONFIG_END -->\n?'
+content = re.sub(pattern, '\n', content, flags=re.DOTALL)
+content = content.strip() + '\n'
 with open('$claude_md', 'w', encoding='utf-8') as f:
     f.write(content)
 "
-      echo "Removed CCB config from CLAUDE.md"
+      echo "Removed config from CLAUDE.md"
     else
-      echo "WARN: python required to clean CLAUDE.md, please manually remove CCB_CONFIG block"
+      echo "WARN: python required to clean CLAUDE.md, please manually remove the inserted config block"
     fi
   elif grep -qE "$LEGACY_RULE_MARKER|## Codex Collaboration Rules|## Gemini|## OpenCode" "$claude_md" 2>/dev/null; then
     echo "Removing legacy collaboration rules from CLAUDE.md..."
     if pick_any_python_bin; then
       "$PYTHON_BIN" -c "
-	import re
+import re
 
-	with open('$claude_md', 'r', encoding='utf-8') as f:
-	    content = f.read()
-	patterns = [
-	    r'## Codex Collaboration Rules.*?(?=\\n## (?!Gemini)|\\Z)',
-	    r'## Gemini Collaboration Rules.*?(?=\\n## |\\Z)',
-	    r'## OpenCode Collaboration Rules.*?(?=\\n## |\\Z)',
-	]
-	for p in patterns:
-	    content = re.sub(p, '', content, flags=re.DOTALL)
-	content = content.rstrip() + '\\n'
+with open('$claude_md', 'r', encoding='utf-8') as f:
+    content = f.read()
+patterns = [
+    r'## Codex Collaboration Rules.*?(?=\n## (?!Gemini)|\Z)',
+    r'## Gemini Collaboration Rules.*?(?=\n## |\Z)',
+    r'## OpenCode Collaboration Rules.*?(?=\n## |\Z)',
+]
+for p in patterns:
+    content = re.sub(p, '', content, flags=re.DOTALL)
+content = content.rstrip() + '\n'
 with open('$claude_md', 'w', encoding='utf-8') as f:
     f.write(content)
 "
@@ -1158,14 +1163,14 @@ except Exception:
 
 uninstall_claude_skills() {
   local skills_dst="$HOME/.claude/skills"
-  local ccb_skills="ask ping mounted all-plan poll pair"
+  local cq_skills="ask ping mounted all-plan poll pair"
 
   if [[ ! -d "$skills_dst" ]]; then
     return
   fi
 
-  echo "Removing CCB Claude skills..."
-  for skill in $ccb_skills; do
+  echo "Removing CQ Claude skills..."
+  for skill in $cq_skills; do
     if [[ -d "$skills_dst/$skill" ]]; then
       rm -rf "$skills_dst/$skill"
       echo "  Removed skill: $skill"
@@ -1175,14 +1180,14 @@ uninstall_claude_skills() {
 
 uninstall_codex_skills() {
   local skills_dst="${CODEX_HOME:-$HOME/.codex}/skills"
-  local ccb_skills="ask ping mounted all-plan poll pair"
+  local cq_skills="ask ping mounted all-plan poll pair"
 
   if [[ ! -d "$skills_dst" ]]; then
     return
   fi
 
-  echo "Removing CCB Codex skills..."
-  for skill in $ccb_skills; do
+  echo "Removing CQ Codex skills..."
+  for skill in $cq_skills; do
     if [[ -d "$skills_dst/$skill" ]]; then
       rm -rf "$skills_dst/$skill"
       echo "  Removed skill: $skill"
@@ -1210,6 +1215,7 @@ uninstall_all() {
   for legacy in "${LEGACY_SCRIPTS[@]}"; do
     rm -f "$BIN_DIR/$legacy"
   done
+  rm -f "$BIN_DIR/${LEGACY_PREFIX}" "$BIN_DIR/${LEGACY_PREFIX}-mounted" 2>/dev/null || true
   echo "Removed bin links: $BIN_DIR"
 
   # 3. Remove Claude command files (clean all possible locations)

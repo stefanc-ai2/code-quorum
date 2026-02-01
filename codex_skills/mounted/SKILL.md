@@ -16,5 +16,5 @@ Reports which providers are considered "mounted" for the current project.
 ## Execution
 
 ```bash
-cq-mounted || ccb-mounted
+cq-mounted
 ```

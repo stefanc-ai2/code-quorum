@@ -16,13 +16,11 @@ Split-pane collaboration between **Claude** and **Codex** using **tmux** or **We
 
 ## What it does
 
-- `cq` starts **Claude** and/or **Codex** in separate panes and writes per-project session files under `.ccb_config/`.
+- `cq` starts **Claude** and/or **Codex** in separate panes and writes per-project session files under `.cq_config/`.
 - `ask` sends a message directly to the target pane (send-only, always async).
 - Replies come back **in the pane** via `ask --reply-to ...` (bidirectional “reply-via-ask”).
 
 No log tailing/monitoring is required or used.
-
-Compatibility: the legacy `ccb` / `ccb-mounted` commands still work as aliases.
 
 ---
 
@@ -59,10 +57,10 @@ Uninstall:
 
 ## Quickstart
 
-From your project directory (must contain `.ccb_config/`):
+From your project directory (must contain `.cq_config/`):
 
 ```bash
-mkdir -p .ccb_config
+mkdir -p .cq_config
 cq codex,claude
 ```
 
@@ -87,7 +85,7 @@ ask codex --reply-to <REQ_ID> --caller claude "Here are my notes..."
 ask claude --reply-to <REQ_ID> --caller codex "Here are my notes..."
 ```
 
-Tip: when you *expect* reply-via-ask, set a stable id with `--req-id`. `ask` includes a `CCB_REQ_ID: <id>` line at the top automatically so the recipient can copy it.
+Tip: when you *expect* reply-via-ask, set a stable id with `--req-id`. `ask` includes a `CQ_REQ_ID: <id>` line at the top automatically so the recipient can copy it.
 
 ```bash
 REQ_ID="$(python -c 'import secrets; print(secrets.token_hex(16))')"
@@ -100,9 +98,9 @@ EOF
 The reply is wrapped with protocol markers so the caller can identify it:
 
 ```
-CCB_REPLY: <REQ_ID>
-CCB_FROM: claude
-[CCB_RESULT] No reply required.
+CQ_REPLY: <REQ_ID>
+CQ_FROM: claude
+[CQ_RESULT] No reply required.
 
 ...message...
 ```
@@ -111,7 +109,7 @@ CCB_FROM: claude
 
 ## Session isolation (repo A vs repo B)
 
-By default, `ask` resolves sessions **only** for the current project via `.ccb_config/` and will not talk to sessions from a different repository.
+By default, `ask` resolves sessions **only** for the current project via `.cq_config/` and will not talk to sessions from a different repository.
 
 To check what is currently mounted:
 
@@ -124,6 +122,6 @@ cq-mounted --json
 ## Development
 
 ```bash
-python -m compileall -q lib bin ccb cq test
+python -m compileall -q lib bin cq test
 python -m pytest test/ -v --tb=short
 ```

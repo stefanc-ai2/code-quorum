@@ -17,20 +17,20 @@ From `$ARGUMENTS`:
 
 Run:
 ```bash
-cq-mounted || ccb-mounted
+cq-mounted
 ```
 
-If `cq-mounted` succeeds (or `ccb-mounted` succeeds) and returns a `mounted[]` list, define:
+If `cq-mounted` succeeds and returns a `mounted[]` list, define:
 - For this skill, `{self} = codex`
 - `reviewers = mounted - {self}` (skip yourself)
 - If `reviewers=...` is provided, use `reviewers = (mounted ∩ requested_reviewers) - {self}`
 
-If `cq-mounted` (and `ccb-mounted`) fails (non-zero) or returns invalid/empty output:
+If `cq-mounted` fails (non-zero) or returns invalid/empty output:
 - If `reviewers=...` is provided, use `reviewers = requested_reviewers - {self}`
 - Otherwise proceed solo
 
 If `reviewers` is empty, proceed solo but still do the same internal checklist.
-If `reviewers` is non-empty, generate a stable 32-hex `req_id` per reviewer (e.g. `PAIR_REVIEW_REQ_ID_<provider>`) and use it as the `ask` request id (`--req-id ...` or `CCB_REQ_ID=...`). `ask` will include a `CCB_REQ_ID: <id>` line at the top automatically so the reviewer can reply via reply-via-ask.
+If `reviewers` is non-empty, generate a stable 32-hex `req_id` per reviewer (e.g. `PAIR_REVIEW_REQ_ID_<provider>`) and use it as the `ask` request id (`--req-id ...` or `CQ_REQ_ID=...`). `ask` will include a `CQ_REQ_ID: <id>` line at the top automatically so the reviewer can reply via reply-via-ask.
 
 ## Step 1: Plan
 
@@ -72,7 +72,7 @@ You are my pair-programming navigator (reviewer).
 Provide feedback only — do not invoke `/pair` and do not implement changes.
 
 When you're done, send your feedback back to me via reply-via-ask:
-1) Copy the `CCB_REQ_ID: ...` line at the top of this message
+1) Copy the `CQ_REQ_ID: ...` line at the top of this message
 2) Run:
    ask codex --reply-to <id> --caller <your provider> <<'EOF'
    <your feedback>
@@ -124,8 +124,8 @@ After sending review requests to all reviewers: **stop immediately**. Do not con
 Reviewers will send feedback back to your pane via `ask --reply-to ... --caller <provider>`.
 
 Each reply payload should include:
-- `CCB_REPLY: <req_id>` (the req_id from the original `ask`)
-- `CCB_FROM: <provider>`
+- `CQ_REPLY: <req_id>` (the req_id from the original `ask`)
+- `CQ_FROM: <provider>`
 
 This step is multi-turn. To get the feedback: end your turn and wait (do not run additional commands). Reviewers will send messages back to your terminal (driver pane) via `ask --reply-to`.
 Do not scrape panes to collect feedback (forbidden): no `wezterm cli get-text`, no `tmux capture-pane`, etc. The only supported mechanism is reply-via-ask.
@@ -162,7 +162,7 @@ You are my pair-programming navigator (iteration 2).
 Provide feedback only — do not invoke `/pair` and do not implement changes.
 
 When you're done, send your feedback back to me via reply-via-ask:
-1) Copy the `CCB_REQ_ID: ...` line at the top of this message
+1) Copy the `CQ_REQ_ID: ...` line at the top of this message
 2) Run:
    ask codex --reply-to <id> --caller <your provider> <<'EOF'
    <your feedback>

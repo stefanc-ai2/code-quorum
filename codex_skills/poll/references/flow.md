@@ -15,15 +15,15 @@ From `$ARGUMENTS`:
 
 Run:
 ```bash
-cq-mounted || ccb-mounted
+cq-mounted
 ```
 
-If `cq-mounted` succeeds (or `ccb-mounted` succeeds) and returns a `mounted[]` list, define:
+If `cq-mounted` succeeds and returns a `mounted[]` list, define:
 - For this skill, `{self} = codex`
 - `respondents = mounted - {self}`
 - If `respondents=...` is provided, use `respondents = (mounted ∩ requested_respondents) - {self}`
 
-If `cq-mounted` (and `ccb-mounted`) fails (non-zero) or returns invalid/empty output:
+If `cq-mounted` fails (non-zero) or returns invalid/empty output:
 - If `respondents=...` is provided, use `respondents = requested_respondents - {self}`
 - Otherwise proceed solo
 
@@ -56,7 +56,7 @@ Template:
 You are responding to a multi-provider poll. Provide an answer only — do not invoke `/poll`, `/pair`, or `/all-plan`, and do not implement changes.
 
 When you're done, send your answer back to the poll driver via reply-via-ask:
-1) Copy the `CCB_REQ_ID: ...` line at the top of this message
+1) Copy the `CQ_REQ_ID: ...` line at the top of this message
 2) Run:
    ask codex --reply-to <id> --caller <your provider> <<'EOF'
    <your answer>
@@ -101,8 +101,8 @@ Do not send your driver answer to respondents; broadcast only the question.
 Respondents send answers back to your pane via `ask --reply-to ... --caller <provider>`.
 
 Each reply payload should include:
-- `CCB_REPLY: <POLL_ID>`
-- `CCB_FROM: <provider>`
+- `CQ_REPLY: <POLL_ID>`
+- `CQ_FROM: <provider>`
 
 This flow is **multi-turn**. To collect replies: end your turn (do not run additional commands). Respondents will send messages back to your terminal (driver pane) via `ask --reply-to`.
 

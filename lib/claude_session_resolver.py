@@ -13,12 +13,12 @@ from session_registry import (
     load_registry_by_project_id_unfiltered,
     load_registry_by_session_id,
 )
-from project_id import compute_ccb_project_id
+from project_id import compute_cq_project_id
 from session_utils import find_project_session_file, project_config_dir
 
 
 SESSION_ENV_KEYS = (
-    "CCB_SESSION_ID",
+    "CQ_SESSION_ID",
     "CODEX_SESSION_ID",
     "GEMINI_SESSION_ID",
     "OPENCODE_SESSION_ID",
@@ -82,7 +82,7 @@ def _data_from_registry(record: dict, fallback_work_dir: Path) -> dict:
     if not isinstance(record, dict):
         return data
 
-    data["ccb_project_id"] = record.get("ccb_project_id")
+    data["cq_project_id"] = record.get("cq_project_id")
     data["work_dir"] = record.get("work_dir") or str(fallback_work_dir)
     data["terminal"] = record.get("terminal")
 
@@ -197,25 +197,25 @@ def _normalize_session_binding(data: dict, work_dir: Path) -> None:
 def resolve_claude_session(work_dir: Path) -> Optional[ClaudeSessionResolution]:
     best_fallback: Optional[ClaudeSessionResolution] = None
     try:
-        current_pid = compute_ccb_project_id(work_dir)
+        current_pid = compute_cq_project_id(work_dir)
     except Exception:
         current_pid = ""
-    strict_project = (Path(work_dir) / ".ccb_config").is_dir()
-    allow_cross = os.environ.get("CCB_ALLOW_CROSS_PROJECT_SESSION") in ("1", "true", "yes")
+    strict_project = (Path(work_dir) / ".cq_config").is_dir()
+    allow_cross = os.environ.get("CQ_ALLOW_CROSS_PROJECT_SESSION") in ("1", "true", "yes")
     if not strict_project and not allow_cross:
         return None
 
     def _record_project_id(record: dict) -> str:
         if not isinstance(record, dict):
             return ""
-        pid = str(record.get("ccb_project_id") or "").strip()
+        pid = str(record.get("cq_project_id") or "").strip()
         if pid:
             return pid
         wd = str(record.get("work_dir") or "").strip()
         if not wd:
             return ""
         try:
-            return compute_ccb_project_id(Path(wd))
+            return compute_cq_project_id(Path(wd))
         except Exception:
             return ""
 
@@ -250,9 +250,9 @@ def resolve_claude_session(work_dir: Path) -> Optional[ClaudeSessionResolution]:
             return resolved
         break
 
-    # 2) Registry via ccb_project_id
+    # 2) Registry via cq_project_id
     try:
-        pid = compute_ccb_project_id(work_dir)
+        pid = compute_cq_project_id(work_dir)
     except Exception:
         pid = ""
     if pid:
