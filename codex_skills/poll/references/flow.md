@@ -73,7 +73,7 @@ Question:
 <paste question>
 
 Reply with:
-1) Answer (2-8 sentences)
+1) Answer
 2) Confidence: high|medium|low
 3) Key assumptions / caveats (bullets)
 ```
@@ -92,7 +92,7 @@ Note: Don’t worry about how to get the reply yet — just send the request and
 
 After broadcasting to respondents, write your own answer **independently** (don’t wait for anyone else, and don’t look at any replies yet):
 
-- Answer (2-8 sentences)
+- Answer
 - Confidence: high|medium|low
 - Key assumptions / caveats (bullets)
 
