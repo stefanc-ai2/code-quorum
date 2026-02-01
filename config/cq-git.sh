@@ -11,6 +11,7 @@ set -euo pipefail
 path="${1:-}"
 
 ttl_s_raw="${CCB_TMUX_GIT_TTL_S:-3}"
+ttl_s_raw="${CQ_TMUX_GIT_TTL_S:-$ttl_s_raw}"
 ttl_s=3
 if [[ "$ttl_s_raw" =~ ^[0-9]+$ ]]; then
   ttl_s="$ttl_s_raw"
@@ -89,4 +90,3 @@ refresh_cache_async() {
 cached="$(read_cache)"
 refresh_cache_async
 echo "${cached:-"-"}"
-

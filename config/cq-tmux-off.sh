@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# CQ tmux UI restore helper (session-scoped).
+
 if ! command -v tmux >/dev/null 2>&1; then
   exit 0
 fi

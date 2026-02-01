@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
-# CCB Status Bar Script for tmux
-# Shows daemon status and active AI sessions
+# CQ Status Bar Script for tmux
+# Shows active AI panes (tmux) and legacy daemon status.
 
-CCB_DIR="${CCB_DIR:-$HOME/.local/share/ccb}"
-CCB_CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/ccb"
+CQ_DIR="${CQ_DIR:-${CCB_DIR:-$HOME/.local/share/code-quorum}}"
+CCB_DIR="${CCB_DIR:-$CQ_DIR}"
+
+CQ_CACHE_DIR="${CQ_CACHE_DIR:-${CCB_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/code-quorum}}"
+CCB_CACHE_DIR="${CCB_CACHE_DIR:-$CQ_CACHE_DIR}"
 TMP_DIR="${TMPDIR:-/tmp}"
 
 # Color codes for tmux status bar (Tokyo Night palette)
@@ -87,7 +90,7 @@ format_ai_status() {
 # Main status output
 main() {
     local mode="${1:-full}"
-    local cache_s="${CCB_STATUS_CACHE_S:-1}"
+    local cache_s="${CQ_STATUS_CACHE_S:-${CCB_STATUS_CACHE_S:-1}}"
     local cache_key=""
     local cache_suffix="${cache_key:-default}"
     local cache_file="$TMP_DIR/ccb-status.${mode}.${cache_suffix}.cache"
@@ -142,7 +145,7 @@ main() {
 
         compact)
             # Compact colorful status with individual daemon icons
-            local output="${C_PINK}CCB${C_RESET} "
+            local output="${C_PINK}CQ${C_RESET} "
             local icons=""
 
             # Use circles/dots for status
@@ -171,15 +174,32 @@ main() {
             ;;
 
         modern)
-            # Modern status: C X G O with dots (● = online, ○ = offline)
+            # Modern status: C X G O D with dots (● = online, ○ = offline)
             local output=""
 
-            # C - Claude (no daemon, always dim)
-            output+="${C_DIM}○${C_RESET} "
+            # Prefer checking tmux panes by title marker (no scraping/capture).
+            local pane_titles=""
+            pane_titles="$(tmux list-panes -a -F '#{pane_title}' 2>/dev/null || true)"
 
-            # X - Codex (cask daemon)
-            if [[ $(check_daemon "cask") == "on" ]]; then
+            local has_claude=0
+            if printf '%s\n' "$pane_titles" | grep -qE '^(CCB|CQ)-Claude'; then
+                has_claude=1
+            fi
+            local has_codex=0
+            if printf '%s\n' "$pane_titles" | grep -qE '^(CCB|CQ)-Codex'; then
+                has_codex=1
+            fi
+
+            # C - Claude
+            if [[ $has_claude -eq 1 ]]; then
                 output+="${C_ORANGE}●${C_RESET} "
+            else
+                output+="${C_DIM}○${C_RESET} "
+            fi
+
+            # X - Codex
+            if [[ $has_codex -eq 1 ]]; then
+                output+="${C_GREEN}●${C_RESET} "
             else
                 output+="${C_DIM}○${C_RESET} "
             fi
@@ -213,9 +233,11 @@ main() {
             local pane_title="${TMUX_PANE_TITLE:-}"
             local pane_title_lc
             pane_title_lc="$(printf '%s' "$pane_title" | tr '[:upper:]' '[:lower:]')"
-            if [[ "$pane_title_lc" == ccb-* ]]; then
+            if [[ "$pane_title_lc" == ccb-* || "$pane_title_lc" == cq-* ]]; then
                 local ai_name="${pane_title#CCB-}"
                 ai_name="${ai_name#ccb-}"
+                ai_name="${ai_name#CQ-}"
+                ai_name="${ai_name#cq-}"
                 local ai_key
                 ai_key="$(printf '%s' "$ai_name" | tr '[:upper:]' '[:lower:]')"
                 case "$ai_key" in

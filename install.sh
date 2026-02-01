@@ -758,79 +758,90 @@ except Exception as e:
   fi
 }
 
-CCB_TMUX_MARKER="# ============================================================================="
-CCB_TMUX_MARKER_LEGACY="# CCB tmux configuration"
+	CQ_TMUX_MARKER="# CQ (Code Quorum) tmux configuration"
+	CCB_TMUX_MARKER="# CCB (Claude Code Bridge) tmux configuration"
+	CCB_TMUX_MARKER_LEGACY="# CCB tmux configuration"
 
 install_tmux_config() {
   local tmux_conf="$HOME/.tmux.conf"
-  local ccb_tmux_conf="$REPO_ROOT/config/tmux-ccb.conf"
-  local ccb_status_script="$REPO_ROOT/config/ccb-status.sh"
-  local status_install_path="$BIN_DIR/ccb-status.sh"
+  local cq_tmux_conf="$REPO_ROOT/config/tmux-cq.conf"
+  local cq_status_script="$REPO_ROOT/config/cq-status.sh"
+  local status_install_path="$BIN_DIR/cq-status.sh"
 
-  if [[ ! -f "$ccb_tmux_conf" ]]; then
+  if [[ ! -f "$cq_tmux_conf" ]]; then
     return
   fi
 
   mkdir -p "$BIN_DIR"
 
-  # Install ccb-status.sh script
-  if [[ -f "$ccb_status_script" ]]; then
-    cp "$ccb_status_script" "$status_install_path"
+  # Clean up any legacy ccb-* helper scripts (cq-* are the canonical names now).
+  rm -f \
+    "$BIN_DIR/ccb-status.sh" \
+    "$BIN_DIR/ccb-border.sh" \
+    "$BIN_DIR/ccb-git.sh" \
+    "$BIN_DIR/ccb-tmux-on.sh" \
+    "$BIN_DIR/ccb-tmux-off.sh" \
+    2>/dev/null || true
+
+  # Install cq-status.sh script
+  if [[ -f "$cq_status_script" ]]; then
+    cp "$cq_status_script" "$status_install_path"
     chmod +x "$status_install_path"
     echo "Installed: $status_install_path"
   fi
 
-  # Install ccb-border.sh script (dynamic pane border colors)
-  local ccb_border_script="$REPO_ROOT/config/ccb-border.sh"
-  local border_install_path="$BIN_DIR/ccb-border.sh"
-  if [[ -f "$ccb_border_script" ]]; then
-    cp "$ccb_border_script" "$border_install_path"
+  # Install cq-border.sh script (dynamic pane border colors)
+  local cq_border_script="$REPO_ROOT/config/cq-border.sh"
+  local border_install_path="$BIN_DIR/cq-border.sh"
+  if [[ -f "$cq_border_script" ]]; then
+    cp "$cq_border_script" "$border_install_path"
     chmod +x "$border_install_path"
     echo "Installed: $border_install_path"
   fi
 
-  # Install ccb-git.sh script (cached git status for tmux status line)
-  local ccb_git_script="$REPO_ROOT/config/ccb-git.sh"
-  local git_install_path="$BIN_DIR/ccb-git.sh"
-  if [[ -f "$ccb_git_script" ]]; then
-    cp "$ccb_git_script" "$git_install_path"
+  # Install cq-git.sh script (cached git status for tmux status line)
+  local cq_git_script="$REPO_ROOT/config/cq-git.sh"
+  local git_install_path="$BIN_DIR/cq-git.sh"
+  if [[ -f "$cq_git_script" ]]; then
+    cp "$cq_git_script" "$git_install_path"
     chmod +x "$git_install_path"
     echo "Installed: $git_install_path"
   fi
 
-  # Install tmux UI toggle scripts (enable/disable CCB theming per-session)
-  local ccb_tmux_on_script="$REPO_ROOT/config/ccb-tmux-on.sh"
-  local ccb_tmux_off_script="$REPO_ROOT/config/ccb-tmux-off.sh"
-  if [[ -f "$ccb_tmux_on_script" ]]; then
-    cp "$ccb_tmux_on_script" "$BIN_DIR/ccb-tmux-on.sh"
-    chmod +x "$BIN_DIR/ccb-tmux-on.sh"
-    echo "Installed: $BIN_DIR/ccb-tmux-on.sh"
+  # Install tmux UI toggle scripts (enable/disable CQ theming per-session)
+  local cq_tmux_on_script="$REPO_ROOT/config/cq-tmux-on.sh"
+  local cq_tmux_off_script="$REPO_ROOT/config/cq-tmux-off.sh"
+  if [[ -f "$cq_tmux_on_script" ]]; then
+    cp "$cq_tmux_on_script" "$BIN_DIR/cq-tmux-on.sh"
+    chmod +x "$BIN_DIR/cq-tmux-on.sh"
+    echo "Installed: $BIN_DIR/cq-tmux-on.sh"
   fi
-  if [[ -f "$ccb_tmux_off_script" ]]; then
-    cp "$ccb_tmux_off_script" "$BIN_DIR/ccb-tmux-off.sh"
-    chmod +x "$BIN_DIR/ccb-tmux-off.sh"
-    echo "Installed: $BIN_DIR/ccb-tmux-off.sh"
+  if [[ -f "$cq_tmux_off_script" ]]; then
+    cp "$cq_tmux_off_script" "$BIN_DIR/cq-tmux-off.sh"
+    chmod +x "$BIN_DIR/cq-tmux-off.sh"
+    echo "Installed: $BIN_DIR/cq-tmux-off.sh"
   fi
 
   # Check if already configured (new or legacy marker)
   local already_configured=false
   if [[ -f "$tmux_conf" ]]; then
-    if grep -q "$CCB_TMUX_MARKER" "$tmux_conf" 2>/dev/null || \
+    if grep -q "$CQ_TMUX_MARKER" "$tmux_conf" 2>/dev/null || \
+       grep -q "$CCB_TMUX_MARKER" "$tmux_conf" 2>/dev/null || \
        grep -q "$CCB_TMUX_MARKER_LEGACY" "$tmux_conf" 2>/dev/null; then
       already_configured=true
     fi
   fi
 
   if $already_configured; then
-    # Update existing config: remove old CCB block and re-add
-    echo "Updating CCB tmux configuration..."
+    # Update existing config: remove old CQ/CCB block and re-add
+    echo "Updating CQ tmux configuration..."
     if pick_any_python_bin; then
       "$PYTHON_BIN" -c "
 import re
 with open('$tmux_conf', 'r', encoding='utf-8') as f:
     content = f.read()
-# Remove old CCB tmux config block (both new and legacy markers)
-pattern = r'\n*# =+\n# CCB \(Claude Code Bridge\) tmux configuration.*?# =+\n# End of CCB tmux configuration\n# =+'
+# Remove old CQ/CCB tmux config block (both new and legacy markers)
+pattern = r'\n*# =+\n# (?:CCB \(Claude Code Bridge\)|CQ \(Code Quorum\)) tmux configuration.*?# =+\n# End of (?:CCB|CQ) tmux configuration\n# =+'
 content = re.sub(pattern, '', content, flags=re.DOTALL)
 pattern = r'\n*# CCB tmux configuration.*'
 content = re.sub(pattern, '', content, flags=re.DOTALL)
@@ -845,27 +856,27 @@ with open('$tmux_conf', 'w', encoding='utf-8') as f:
     fi
   fi
 
-  # Append CCB tmux config (fill in BIN_DIR placeholders)
+  # Append CQ tmux config (fill in BIN_DIR placeholders)
   {
     echo ""
     if pick_any_python_bin; then
       "$PYTHON_BIN" -c "
 import sys
 
-path = '$ccb_tmux_conf'
+path = '$cq_tmux_conf'
 bin_dir = '$BIN_DIR'
 with open(path, 'r', encoding='utf-8') as f:
     content = f.read()
-sys.stdout.write(content.replace('@CCB_BIN_DIR@', bin_dir))
-" 2>/dev/null || cat "$ccb_tmux_conf"
+sys.stdout.write(content.replace('@CQ_BIN_DIR@', bin_dir).replace('@CCB_BIN_DIR@', bin_dir))
+" 2>/dev/null || cat "$cq_tmux_conf"
     else
-      cat "$ccb_tmux_conf"
+      cat "$cq_tmux_conf"
     fi
   } >> "$tmux_conf"
 
   echo "Updated tmux configuration: $tmux_conf"
-  echo "   - CCB tmux integration (copy mode, mouse, pane management)"
-  echo "   - CCB theme is enabled only while CCB is running (auto restore on exit)"
+  echo "   - CQ tmux integration (copy mode, mouse, pane management)"
+  echo "   - CQ theme is enabled only while CQ is running (auto restore on exit)"
   echo "   - Vi-style pane management with h/j/k/l"
   echo "   - Mouse support and better copy mode"
   echo "   - Run 'tmux source ~/.tmux.conf' to apply (or restart tmux)"
@@ -885,58 +896,52 @@ sys.stdout.write(content.replace('@CCB_BIN_DIR@', bin_dir))
 
 uninstall_tmux_config() {
   local tmux_conf="$HOME/.tmux.conf"
-  local status_script="$BIN_DIR/ccb-status.sh"
-  local border_script="$BIN_DIR/ccb-border.sh"
-  local tmux_on_script="$BIN_DIR/ccb-tmux-on.sh"
-  local tmux_off_script="$BIN_DIR/ccb-tmux-off.sh"
+  local scripts=(
+    "$BIN_DIR/cq-status.sh"
+    "$BIN_DIR/cq-border.sh"
+    "$BIN_DIR/cq-git.sh"
+    "$BIN_DIR/cq-tmux-on.sh"
+    "$BIN_DIR/cq-tmux-off.sh"
+    "$BIN_DIR/ccb-status.sh"
+    "$BIN_DIR/ccb-border.sh"
+    "$BIN_DIR/ccb-git.sh"
+    "$BIN_DIR/ccb-tmux-on.sh"
+    "$BIN_DIR/ccb-tmux-off.sh"
+  )
 
-  # Remove ccb-status.sh script
-  if [[ -f "$status_script" ]]; then
-    rm -f "$status_script"
-    echo "Removed: $status_script"
-  fi
-
-  # Remove ccb-border.sh script
-  if [[ -f "$border_script" ]]; then
-    rm -f "$border_script"
-    echo "Removed: $border_script"
-  fi
-
-  # Remove tmux UI toggle scripts
-  if [[ -f "$tmux_on_script" ]]; then
-    rm -f "$tmux_on_script"
-    echo "Removed: $tmux_on_script"
-  fi
-  if [[ -f "$tmux_off_script" ]]; then
-    rm -f "$tmux_off_script"
-    echo "Removed: $tmux_off_script"
-  fi
+  for script in "${scripts[@]}"; do
+    if [[ -f "$script" ]]; then
+      rm -f "$script"
+      echo "Removed: $script"
+    fi
+  done
 
   if [[ ! -f "$tmux_conf" ]]; then
     return
   fi
 
   # Check for both new and legacy markers
-  if ! grep -q "$CCB_TMUX_MARKER" "$tmux_conf" 2>/dev/null && \
+  if ! grep -q "$CQ_TMUX_MARKER" "$tmux_conf" 2>/dev/null && \
+     ! grep -q "$CCB_TMUX_MARKER" "$tmux_conf" 2>/dev/null && \
      ! grep -q "$CCB_TMUX_MARKER_LEGACY" "$tmux_conf" 2>/dev/null; then
     return
   fi
 
-  echo "Removing CCB tmux configuration..."
+  echo "Removing CQ tmux configuration..."
   if pick_any_python_bin; then
     "$PYTHON_BIN" -c "
 import re
 with open('$tmux_conf', 'r', encoding='utf-8') as f:
     content = f.read()
-# Remove CCB tmux config block (both new and legacy markers)
-pattern = r'\n*# =+\n# CCB \(Claude Code Bridge\) tmux configuration.*?# =+\n# End of CCB tmux configuration\n# =+'
+# Remove CQ/CCB tmux config block (both new and legacy markers)
+pattern = r'\n*# =+\n# (?:CCB \(Claude Code Bridge\)|CQ \(Code Quorum\)) tmux configuration.*?# =+\n# End of (?:CCB|CQ) tmux configuration\n# =+'
 content = re.sub(pattern, '', content, flags=re.DOTALL)
 pattern = r'\n*# CCB tmux configuration.*'
 content = re.sub(pattern, '', content, flags=re.DOTALL)
 with open('$tmux_conf', 'w', encoding='utf-8') as f:
     f.write(content.strip() + '\n' if content.strip() else '')
 "
-    echo "Removed CCB tmux configuration from $tmux_conf"
+    echo "Removed CQ tmux configuration from $tmux_conf"
   fi
 }
 

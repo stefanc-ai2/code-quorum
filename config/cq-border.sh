@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# CCB Border Color Script - sets active pane border based on pane title
+# CQ Border Color Script - sets active pane border based on pane title
 
 arg="$1"
 pane_id=""
@@ -51,7 +51,13 @@ case "$key" in
             CCB-Codex*)
                 set_border "fg=#ff9e64,bold"
                 ;;
+            CQ-Codex*)
+                set_border "fg=#ff9e64,bold"
+                ;;
             CCB-Gemini*)
+                set_border "fg=#7dcfff,bold"
+                ;;
+            CQ-Gemini*)
                 set_border "fg=#7dcfff,bold"
                 ;;
             Claude*)
@@ -60,10 +66,19 @@ case "$key" in
             CCB-OpenCode*)
                 set_border "fg=#9ece6a,bold"
                 ;;
+            CQ-OpenCode*)
+                set_border "fg=#9ece6a,bold"
+                ;;
             CCB-Droid*)
                 set_border "fg=#e0af68,bold"
                 ;;
+            CQ-Droid*)
+                set_border "fg=#e0af68,bold"
+                ;;
             CCB-Cmd*)
+                set_border "fg=#7dcfff,bold"
+                ;;
+            CQ-Cmd*)
                 set_border "fg=#7dcfff,bold"
                 ;;
             *)

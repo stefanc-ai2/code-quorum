@@ -581,7 +581,7 @@ class AILauncher:
 
     def _set_tmux_ui_active(self, active: bool) -> None:
         """
-        Enable/disable CCB tmux UI theming for the *current tmux session*.
+        Enable/disable CQ tmux UI theming for the *current tmux session*.
 
         This is session-scoped and reversible (saves/restores user options) via helper scripts
         installed to `~/.local/bin/`.
@@ -590,13 +590,20 @@ class AILauncher:
             return
         if not os.environ.get("TMUX"):
             return
-        script = Path.home() / ".local" / "bin" / ("ccb-tmux-on.sh" if active else "ccb-tmux-off.sh")
-        if not script.exists():
+
+        candidates = ["cq-tmux-on.sh", "ccb-tmux-on.sh"] if active else ["cq-tmux-off.sh", "ccb-tmux-off.sh"]
+        script_path = None
+        for name in candidates:
+            found = shutil.which(name)
+            if found:
+                script_path = Path(found)
+                break
+        if not script_path or not script_path.exists():
             return
         try:
-            debug = os.environ.get("CCB_DEBUG") in ("1", "true", "yes")
+            debug = (os.environ.get("CQ_DEBUG") or os.environ.get("CCB_DEBUG")) in ("1", "true", "yes")
             cp = subprocess.run(
-                [str(script)],
+                [str(script_path)],
                 check=False,
                 capture_output=debug,
                 text=True,
