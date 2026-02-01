@@ -32,7 +32,6 @@ If `respondents` is empty, proceed solo: answer the question yourself and clearl
 Generate a fresh correlation id (32-hex) you can match against later. Use it as the `req_id` for all broadcast `ask` calls:
 - `POLL_ID = <32-hex id>` (example: `66094bea382bbce94019e3ea9218ac81`)
   - Generate: `POLL_ID="$(python -c 'import secrets; print(secrets.token_hex(16))')"`
-- `POLL_DRIVER = {self}` (the provider that invoked `/poll`)
 
 ## Step 1: Clarify if needed
 
@@ -53,16 +52,13 @@ You are responding to a multi-provider poll. Provide an answer only — do not i
 When you're done, send your answer back to the poll driver via reply-via-ask:
 1) Copy the `CQ_REQ_ID: ...` line at the top of this message
 2) Run:
-   ask claude --reply-to <id> --caller <your provider> <<'EOF'
+   ask claude --reply-to <CQ_REQ_ID> --caller <your provider> <<'EOF'
    <your answer>
    EOF
 Do not reply in your own pane; send your answer via `ask --reply-to` so it arrives in the driver's pane.
 
 POLL_ID:
 <paste id>
-
-POLL_DRIVER:
-claude
 
 Question:
 <paste question>

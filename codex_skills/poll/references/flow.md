@@ -1,12 +1,14 @@
 # Poll (Multi-Provider Q&A) - Flow
 
 This workflow simulates “ask the room”:
+
 - **You** = Driver (the provider that invoked `/poll`; broadcasts first, drafts its own answer, then ends its turn to collect replies, then synthesizes)
 - **Other mounted providers** = Respondents (answer independently; no code changes)
 
 ## Inputs
 
 From `$ARGUMENTS`:
+
 - `question`: the question to broadcast
 - Optional: `respondents=<comma-separated providers>` (default: all mounted except `{self}`)
 - Optional: `format=consensus|list|table` (default: `consensus`)
@@ -14,25 +16,28 @@ From `$ARGUMENTS`:
 ## Step 0: Detect which providers can respond
 
 Run:
+
 ```bash
 cq-mounted
 ```
 
 If `cq-mounted` succeeds and returns a `mounted[]` list, define:
+
 - For this skill, `{self} = codex`
 - `respondents = mounted - {self}`
 - If `respondents=...` is provided, use `respondents = (mounted ∩ requested_respondents) - {self}`
 
 If `cq-mounted` fails (non-zero) or returns invalid/empty output:
+
 - If `respondents=...` is provided, use `respondents = requested_respondents - {self}`
 - Otherwise proceed solo
 
 If `respondents` is empty, proceed solo: answer the question yourself and clearly label it as a solo response.
 
 Generate a fresh correlation id (32-hex) you can match against later. Use it as the `req_id` for all broadcast `ask` calls:
+
 - `POLL_ID = <32-hex id>` (example: `66094bea382bbce94019e3ea9218ac81`)
   - Generate: `POLL_ID="$(python -c 'import secrets; print(secrets.token_hex(16))')"`
-- `POLL_DRIVER = {self}` (the provider that invoked `/poll`)
 
 ## Step 1: Clarify if needed
 
@@ -47,11 +52,13 @@ Send one request per respondent.
 ### Prompt template (use as-is)
 
 Provide respondents with:
+
 - The question
 - The correlation id (`POLL_ID`)
 - Explicit instruction to not invoke skills
 
 Template:
+
 ```
 You are responding to a multi-provider poll. Provide an answer only — do not invoke `/poll`, `/pair`, or `/all-plan`, and do not implement changes.
 
@@ -66,9 +73,6 @@ Do not reply in your own pane; send your answer via `ask --reply-to` so it arriv
 POLL_ID:
 <paste id>
 
-POLL_DRIVER:
-codex
-
 Question:
 <paste question>
 
@@ -79,6 +83,7 @@ Reply with:
 ```
 
 Then run, once per respondent (sequentially; pause ~1s between providers):
+
 ```bash
 ask <provider> --req-id "$POLL_ID" <<'EOF'
 <message>
@@ -90,6 +95,7 @@ Note: Don’t worry about how to get the reply yet — just send the request and
 ## Step 2.5: Driver answer (while waiting)
 
 After broadcasting to respondents, write your own answer **independently** (don’t wait for anyone else, and don’t look at any replies yet):
+
 - Answer (2-8 sentences)
 - Confidence: high|medium|low
 - Key assumptions / caveats (bullets)
@@ -101,6 +107,7 @@ Do not send your driver answer to respondents; broadcast only the question.
 Respondents send answers back to your pane via `ask --reply-to ... --caller <provider>`.
 
 Each reply payload should include:
+
 - `CQ_REPLY: <POLL_ID>`
 - `CQ_FROM: <provider>`
 
@@ -111,12 +118,14 @@ Do not scrape panes to collect answers (forbidden): no `wezterm cli get-text`, n
 ## Step 4: Synthesize
 
 Create a combined answer with:
+
 - A “consensus” section (or “no consensus”)
 - Disagreements/outliers (by provider)
 - Caveats & assumptions (deduped)
 - Action items / follow-ups (only if needed)
 
 Synthesis heuristics:
+
 - If a majority agrees on the core answer, report as consensus.
 - If split, report vote counts and the main trade-off axes.
 - Prefer high-confidence answers when weighing ambiguous splits.
@@ -128,6 +137,7 @@ Synthesis heuristics:
 Use the requested format (default: `consensus`).
 
 ### Format: consensus (default)
+
 ```
 ## Poll Results
 
@@ -157,6 +167,7 @@ Use the requested format (default: `consensus`).
 ```
 
 ### Format: list
+
 ```
 ## Poll Results
 
@@ -174,6 +185,7 @@ Use the requested format (default: `consensus`).
 ```
 
 ### Format: table
+
 ```
 ## Poll Results
 

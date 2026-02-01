@@ -79,9 +79,6 @@ When you're done, send your feedback back to me via reply-via-ask:
    EOF
 Do not reply in your own pane; send feedback via `ask --reply-to` so it arrives in my pane.
 
-PAIR_DRIVER:
-claude
-
 Requirement:
 <paste requirement>
 
@@ -165,9 +162,6 @@ When you're done, send your feedback back to me via reply-via-ask:
    ask claude --reply-to <id> --caller <your provider> <<'EOF'
    <your feedback>
    EOF
-
-PAIR_DRIVER:
-claude
 
 What changed since iteration 1:
 - <bullet>
