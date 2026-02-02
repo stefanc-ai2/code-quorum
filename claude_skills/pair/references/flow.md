@@ -43,6 +43,8 @@ Otherwise produce a compact plan:
 - Risks / assumptions
 - Test plan (what to run / what to add)
 
+Keep the plan biased toward the simplest approach that works (avoid unnecessary abstractions, flags, or refactors).
+
 Proceed with reasonable assumptions when required, but call them out explicitly.
 
 ## Step 2: Implementation (Driver pass)
@@ -51,6 +53,7 @@ Implement the plan with a bias toward:
 - Small, reviewable changes
 - Clear errors and edge-case handling
 - Minimal scope (fix root cause; avoid drive-by refactors)
+- Simplicity and elegance: prefer the smallest change that works; delete/simplify code when possible
 
 Run the most relevant local validations available (tests and/or build checks).
 
@@ -94,7 +97,7 @@ Please review for:
 1) correctness/edge cases
 2) API/UX clarity (errors/messages)
 3) tests (what’s missing?)
-4) maintainability (simpler alternatives)
+4) simplicity: could any of this be deleted or made simpler?
 
 Reply with:
 - Must-fix issues
@@ -170,6 +173,7 @@ What changed since iteration 1:
 Please focus on:
 1) tests/coverage gaps
 2) maintainability/simpler alternatives
+3) simplification: could anything be deleted or made simpler?
 
 Reply with Must-fix / Should-fix / Nice-to-have.
 ```
