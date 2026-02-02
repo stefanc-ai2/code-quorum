@@ -9,4 +9,3 @@ def get_backend_env() -> str | None:
 def apply_backend_env() -> None:
     """No-op (Windows/WSL support removed)."""
     return
-

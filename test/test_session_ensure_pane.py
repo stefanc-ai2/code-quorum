@@ -30,7 +30,7 @@ def test_ensure_pane_marker_rediscovers(tmp_path: Path, monkeypatch: pytest.Monk
         "session_id": "test-session",
         "terminal": "tmux",
         "pane_id": "%1",  # This pane is dead
-        "pane_title_marker": "CCB-codex-test",
+        "pane_title_marker": "CQ-codex-test",
         "runtime_dir": str(tmp_path),
         "work_dir": str(tmp_path),
         "active": True,
@@ -40,7 +40,7 @@ def test_ensure_pane_marker_rediscovers(tmp_path: Path, monkeypatch: pytest.Monk
     # %1 is dead, but marker finds %2 which is alive
     fake_backend = FakeBackend(
         alive_panes={"%1": False, "%2": True},
-        marker_map={"CCB-codex": "%2"}
+        marker_map={"CQ-codex": "%2"}
     )
     monkeypatch.setattr(codex_session, "get_backend_for_session", lambda data: fake_backend)
 
@@ -63,7 +63,7 @@ def test_ensure_pane_already_alive(tmp_path: Path, monkeypatch: pytest.MonkeyPat
         "session_id": "test-session",
         "terminal": "tmux",
         "pane_id": "%1",
-        "pane_title_marker": "CCB-codex-test",
+        "pane_title_marker": "CQ-codex-test",
         "work_dir": str(tmp_path),
         "active": True,
     }), encoding="utf-8")
@@ -107,7 +107,7 @@ def test_ensure_pane_dead_no_marker(tmp_path: Path, monkeypatch: pytest.MonkeyPa
         "session_id": "test-session",
         "terminal": "wezterm",  # Not tmux, so no respawn
         "pane_id": "%1",
-        "pane_title_marker": "CCB-codex-test",
+        "pane_title_marker": "CQ-codex-test",
         "work_dir": str(tmp_path),
         "active": True,
     }), encoding="utf-8")

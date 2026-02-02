@@ -18,11 +18,11 @@ def test_find_project_session_file_is_local_only(tmp_path: Path) -> None:
     assert find_project_session_file(root, ".codex-session") == session
 
 
-def test_find_project_session_file_prefers_ccb_config(tmp_path: Path) -> None:
+def test_find_project_session_file_prefers_cq_config(tmp_path: Path) -> None:
     root = tmp_path / "repo"
     root.mkdir(parents=True)
 
-    cfg = root / ".ccb_config"
+    cfg = root / ".cq_config"
     cfg.mkdir(parents=True)
     primary = cfg / ".codex-session"
     primary.write_text("{}", encoding="utf-8")

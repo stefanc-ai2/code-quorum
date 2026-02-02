@@ -1,6 +1,6 @@
 <div align="center">
 
-# Claude Code Bridge (`ccb`)
+# Code Quorum (`cq`)
 
 Split-pane collaboration between **Claude** and **Codex** using **tmux** or **WezTerm**.
 
@@ -16,7 +16,7 @@ Split-pane collaboration between **Claude** and **Codex** using **tmux** or **We
 
 ## What it does
 
-- `ccb` starts **Claude** and/or **Codex** in separate panes and writes per-project session files under `.ccb_config/`.
+- `cq` starts **Claude** and/or **Codex** in separate panes and writes per-project session files under `.cq_config/`.
 - `ask` sends a message directly to the target pane (send-only, always async).
 - Replies come back **in the pane** via `ask --reply-to ...` (bidirectional “reply-via-ask”).
 
@@ -28,7 +28,7 @@ No log tailing/monitoring is required or used.
 
 - Python **3.10+**
 - Either:
-  - tmux (run `tmux` first, then run `ccb` inside tmux), or
+  - tmux (run `tmux` first, then run `cq` inside tmux), or
   - WezTerm (recommended)
 - The `claude` CLI and the `codex` CLI installed and on `PATH`
 
@@ -43,8 +43,8 @@ From a repo checkout:
 ```
 
 This installs:
-- executables into `~/.local/bin` (or `$CODEX_BIN_DIR`)
-- project files into `~/.local/share/codex-dual` (or `$CODEX_INSTALL_PREFIX`)
+- executables into `~/.local/bin` (or `$CQ_BIN_DIR`)
+- project files into `~/.local/share/code-quorum` (or `$CQ_INSTALL_PREFIX`)
 - skills into `~/.claude/skills` and `${CODEX_HOME:-~/.codex}/skills`
 
 Uninstall:
@@ -57,11 +57,11 @@ Uninstall:
 
 ## Quickstart
 
-From your project directory (must contain `.ccb_config/`):
+From your project directory (must contain `.cq_config/`):
 
 ```bash
-mkdir -p .ccb_config
-ccb codex,claude
+mkdir -p .cq_config
+cq codex,claude
 ```
 
 Send a message to a provider:
@@ -85,7 +85,7 @@ ask codex --reply-to <REQ_ID> --caller claude "Here are my notes..."
 ask claude --reply-to <REQ_ID> --caller codex "Here are my notes..."
 ```
 
-Tip: when you *expect* reply-via-ask, set a stable id with `--req-id`. `ask` includes a `CCB_REQ_ID: <id>` line at the top automatically so the recipient can copy it.
+Tip: when you *expect* reply-via-ask, set a stable id with `--req-id`. `ask` includes a `CQ_REQ_ID: <id>` line at the top automatically so the recipient can copy it.
 
 ```bash
 REQ_ID="$(python -c 'import secrets; print(secrets.token_hex(16))')"
@@ -98,9 +98,9 @@ EOF
 The reply is wrapped with protocol markers so the caller can identify it:
 
 ```
-CCB_REPLY: <REQ_ID>
-CCB_FROM: claude
-[CCB_RESULT] No reply required.
+CQ_REPLY: <REQ_ID>
+CQ_FROM: claude
+[CQ_RESULT] No reply required.
 
 ...message...
 ```
@@ -109,12 +109,12 @@ CCB_FROM: claude
 
 ## Session isolation (repo A vs repo B)
 
-By default, `ask` resolves sessions **only** for the current project via `.ccb_config/` and will not talk to sessions from a different repository.
+By default, `ask` resolves sessions **only** for the current project via `.cq_config/` and will not talk to sessions from a different repository.
 
 To check what is currently mounted:
 
 ```bash
-ccb-mounted --json
+cq-mounted --json
 ```
 
 ---
@@ -122,6 +122,6 @@ ccb-mounted --json
 ## Development
 
 ```bash
-python -m compileall -q lib bin ccb test
+python -m compileall -q lib bin cq test
 python -m pytest test/ -v --tb=short
 ```

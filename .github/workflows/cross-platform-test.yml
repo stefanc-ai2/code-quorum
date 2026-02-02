@@ -56,7 +56,9 @@ jobs:
 
       - name: Test unified commands syntax
         run: |
-          chmod +x bin/ask bin/ping
+          chmod +x cq bin/ask bin/ping bin/cq-mounted
+          python cq --help
           python bin/ask --help
           python bin/ping --help
+          python bin/cq-mounted --help
           echo "✅ Unified commands syntax test passed"

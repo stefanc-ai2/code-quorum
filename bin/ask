@@ -47,7 +47,7 @@ from compat import read_stdin_text, setup_windows_encoding
 
 setup_windows_encoding()
 
-from ccb_protocol import make_req_id, wrap_reply_payload, wrap_request_prompt
+from cq_protocol import make_req_id, wrap_reply_payload, wrap_request_prompt
 from claude_session import load_project_session as load_claude_session
 from cli_output import EXIT_ERROR, EXIT_OK
 from codex_session import load_project_session as load_codex_session
@@ -61,10 +61,10 @@ def _env_bool(name: str, default: bool = False) -> bool:
 
 
 def _default_caller() -> str:
-    caller = (os.environ.get("CCB_CALLER") or "").strip()
+    caller = (os.environ.get("CQ_CALLER") or "").strip()
     if caller:
         return caller
-    if _env_bool("CCB_MANAGED", False):
+    if _env_bool("CQ_MANAGED", False):
         return "codex"
     if os.environ.get("CODEX_SESSION_ID") or os.environ.get("CODEX_RUNTIME_DIR"):
         return "codex"
@@ -75,7 +75,7 @@ def _resolve_req_id(override_req_id: str | None) -> str:
     explicit = (override_req_id or "").strip()
     if explicit:
         return explicit
-    env_req_id = (os.environ.get("CCB_REQ_ID") or "").strip()
+    env_req_id = (os.environ.get("CQ_REQ_ID") or "").strip()
     return env_req_id or make_req_id()
 
 
@@ -124,13 +124,13 @@ def main(argv: list[str]) -> int:
         "--req-id",
         dest="override_req_id",
         default=None,
-        help="Override the request id (default: CCB_REQ_ID env var, else auto-generated 32-hex).",
+        help="Override the request id (default: CQ_REQ_ID env var, else auto-generated 32-hex).",
     )
     parser.add_argument(
         "--caller",
         dest="caller",
         default=None,
-        help="Override the `CCB_FROM` value in reply payloads (only used with --reply-to).",
+        help="Override the `CQ_FROM` value in reply payloads (only used with --reply-to).",
     )
     parser.add_argument(
         "message",
@@ -184,7 +184,7 @@ def main(argv: list[str]) -> int:
             f"[ERROR] No active {provider} session found for this directory.",
             file=sys.stderr,
         )
-        print(f"[ERROR] Run `ccb {provider}` in this project first.", file=sys.stderr)
+        print(f"[ERROR] Run `cq {provider}` in this project first.", file=sys.stderr)
         return EXIT_ERROR
 
     ok, pane_or_err = session.ensure_pane()

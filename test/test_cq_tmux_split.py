@@ -8,11 +8,11 @@ from pathlib import Path
 from types import SimpleNamespace
 
 
-def _load_ccb_module() -> object:
+def _load_cq_module() -> object:
     repo_root = Path(__file__).resolve().parents[1]
-    ccb_path = repo_root / "ccb"
-    loader = SourceFileLoader("ccb_script", str(ccb_path))
-    spec = importlib.util.spec_from_loader("ccb_script", loader)
+    cq_path = repo_root / "cq"
+    loader = SourceFileLoader("cq_script", str(cq_path))
+    spec = importlib.util.spec_from_loader("cq_script", loader)
     assert spec and spec.loader
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)  # type: ignore[union-attr]
@@ -20,14 +20,14 @@ def _load_ccb_module() -> object:
 
 
 def test_run_up_sorts_providers_in_tmux(monkeypatch, tmp_path: Path) -> None:
-    ccb = _load_ccb_module()
+    cq = _load_cq_module()
     monkeypatch.chdir(tmp_path)
-    (tmp_path / ".ccb_config").mkdir(parents=True, exist_ok=True)
+    (tmp_path / ".cq_config").mkdir(parents=True, exist_ok=True)
     monkeypatch.setenv("TMUX_PANE", "%0")
-    monkeypatch.setattr(ccb, "detect_terminal", lambda: "tmux")
+    monkeypatch.setattr(cq, "detect_terminal", lambda: "tmux")
 
     # Use dummy provider tokens to exercise the generic provider path (i.e. not "claude" or "cmd").
-    launcher = ccb.AILauncher(providers=["provider_a", "provider_b", "codex"])
+    launcher = cq.AILauncher(providers=["provider_a", "provider_b", "codex"])
     launcher.terminal_type = "tmux"
 
     called: list[str] = []
@@ -48,13 +48,13 @@ def test_run_up_sorts_providers_in_tmux(monkeypatch, tmp_path: Path) -> None:
 
 
 def test_start_codex_tmux_writes_session_file(monkeypatch, tmp_path: Path) -> None:
-    ccb = _load_ccb_module()
+    cq = _load_cq_module()
     monkeypatch.chdir(tmp_path)
-    (tmp_path / ".ccb_config").mkdir(parents=True, exist_ok=True)
+    (tmp_path / ".cq_config").mkdir(parents=True, exist_ok=True)
     monkeypatch.setenv("TMUX_PANE", "%0")
 
     # Ensure runtime dir lands under tmp_path.
-    monkeypatch.setattr(ccb.tempfile, "gettempdir", lambda: str(tmp_path))
+    monkeypatch.setattr(cq.tempfile, "gettempdir", lambda: str(tmp_path))
 
     # Fake tmux backend methods (no real tmux dependency).
     class _FakeTmuxBackend:
@@ -89,7 +89,7 @@ def test_start_codex_tmux_writes_session_file(monkeypatch, tmp_path: Path) -> No
         ) -> None:
             return None
 
-    monkeypatch.setattr(ccb, "TmuxBackend", _FakeTmuxBackend)
+    monkeypatch.setattr(cq, "TmuxBackend", _FakeTmuxBackend)
 
     # Fake `tmux display-message ... #{pane_pid}`.
     def _fake_run(argv, *args, **kwargs):
@@ -97,9 +97,9 @@ def test_start_codex_tmux_writes_session_file(monkeypatch, tmp_path: Path) -> No
             return subprocess.CompletedProcess(argv, 0, stdout="12345\n", stderr="")
         return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
 
-    monkeypatch.setattr(ccb.subprocess, "run", _fake_run)
+    monkeypatch.setattr(cq.subprocess, "run", _fake_run)
 
-    launcher = ccb.AILauncher(providers=["codex"])
+    launcher = cq.AILauncher(providers=["codex"])
     launcher.terminal_type = "tmux"
 
     pane_id = launcher._start_codex_tmux()
@@ -110,8 +110,8 @@ def test_start_codex_tmux_writes_session_file(monkeypatch, tmp_path: Path) -> No
     assert (runtime / "codex.pid").exists()
     assert (runtime / "codex.pid").read_text(encoding="utf-8").strip() == "12345"
 
-    session_file = tmp_path / ".ccb_config" / ".codex-session"
-    data = ccb.json.loads(session_file.read_text(encoding="utf-8"))
+    session_file = tmp_path / ".cq_config" / ".codex-session"
+    data = cq.json.loads(session_file.read_text(encoding="utf-8"))
     assert data["pane_id"] == pane_id
     assert "input_fifo" not in data
     assert "output_fifo" not in data

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# CCB Border Color Script - sets active pane border based on pane title
+# CQ Border Color Script - sets active pane border based on pane title
 
 arg="$1"
 pane_id=""
@@ -8,7 +8,7 @@ agent=""
 
 if [[ "$arg" == %* ]]; then
   pane_id="$arg"
-  agent="$(tmux display-message -p -t "$pane_id" "#{@ccb_agent}" 2>/dev/null | tr -d '\r')"
+  agent="$(tmux display-message -p -t "$pane_id" "#{@cq_agent}" 2>/dev/null | tr -d '\r')"
   title="$(tmux display-message -p -t "$pane_id" "#{pane_title}" 2>/dev/null | tr -d '\r')"
 else
   title="$arg"
@@ -48,22 +48,22 @@ case "$key" in
         ;;
     *)
         case "$title" in
-            CCB-Codex*)
+            CQ-Codex*)
                 set_border "fg=#ff9e64,bold"
                 ;;
-            CCB-Gemini*)
+            CQ-Gemini*)
                 set_border "fg=#7dcfff,bold"
                 ;;
             Claude*)
                 set_border "fg=#bb9af7,bold"
                 ;;
-            CCB-OpenCode*)
+            CQ-OpenCode*)
                 set_border "fg=#9ece6a,bold"
                 ;;
-            CCB-Droid*)
+            CQ-Droid*)
                 set_border "fg=#e0af68,bold"
                 ;;
-            CCB-Cmd*)
+            CQ-Cmd*)
                 set_border "fg=#7dcfff,bold"
                 ;;
             *)

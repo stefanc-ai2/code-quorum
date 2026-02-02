@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """
-ccb (Claude Code Bridge) - Unified AI Launcher
-Split-pane collaboration between Claude and Codex
-Supports tmux and WezTerm
+cq (Code Quorum) - Unified AI Launcher
+Split-pane collaboration between Claude and Codex using tmux or WezTerm.
 """
 
 import sys
@@ -27,19 +26,19 @@ script_dir = Path(__file__).resolve().parent
 sys.path.insert(0, str(script_dir / "lib"))
 from terminal import TmuxBackend, WeztermBackend, detect_terminal
 from compat import setup_windows_encoding
-from ccb_config import get_backend_env
-from ccb_start_config import DEFAULT_PROVIDERS, ensure_default_start_config, load_start_config
+from cq_config import get_backend_env
+from cq_start_config import DEFAULT_PROVIDERS, ensure_default_start_config, load_start_config
 from session_utils import safe_write_session, check_session_writable, find_project_session_file
 from session_registry import upsert_registry
-from project_id import compute_ccb_project_id
+from project_id import compute_cq_project_id
 from process_lock import ProviderLock
 from messages import t
 
 setup_windows_encoding()
 
 backend_env = get_backend_env()
-if backend_env and not os.environ.get("CCB_BACKEND_ENV"):
-    os.environ["CCB_BACKEND_ENV"] = backend_env
+if backend_env and not os.environ.get("CQ_BACKEND_ENV"):
+    os.environ["CQ_BACKEND_ENV"] = backend_env
 
 VERSION = "5.1.3"
 GIT_COMMIT = ""
@@ -159,13 +158,13 @@ def _build_pane_title_cmd(marker: str) -> str:
 
 def _build_export_path_cmd(bin_dir: Path) -> str:
     """
-    Ensure CCB's `bin/` is available inside the started pane/session.
+    Ensure CQ's `bin/` is available inside the started pane/session.
 
-    This allows running CCB's CLI helpers consistently across WezTerm/tmux.
+    This allows running CQ's CLI helpers consistently across WezTerm/tmux.
     """
     bin_s = str(bin_dir)
 
-    # Materialize PATH from the current CCB process instead of relying on the spawned shell's `$PATH`.
+    # Materialize PATH from the current CQ process instead of relying on the spawned shell's `$PATH`.
     # This fixes macOS/Homebrew setups where `python3` exists in the interactive shell, but a spawned
     # pane/session (tmux/Terminal.app) starts with a minimal PATH and `/usr/bin/env python3` fails.
     current = os.environ.get("PATH") or ""
@@ -204,31 +203,31 @@ def _cleanup_tmpclaude_artifacts() -> int:
     """
     Best-effort cleanup for leftover Claude temp markers like `tmpclaude-xxxx-cwd`.
 
-    Deletion is conservative: only removes entries older than `CCB_TMPCLAUDE_MIN_AGE_S`.
+    Deletion is conservative: only removes entries older than `CQ_TMPCLAUDE_MIN_AGE_S`.
     Controls:
-      - `CCB_TMPCLAUDE_CLEAN` (default: true)
-      - `CCB_TMPCLAUDE_CLEAN_CWD` (default: true)
-      - `CCB_TMPCLAUDE_MIN_AGE_S` (default: 300)
-      - `CCB_TMPCLAUDE_DIRS` (extra dirs, split by `os.pathsep`)
-      - `CCB_TMPCLAUDE_PATTERNS` (comma-separated globs; default: tmpclaude-*-cwd)
+      - `CQ_TMPCLAUDE_CLEAN` (default: true)
+      - `CQ_TMPCLAUDE_CLEAN_CWD` (default: true)
+      - `CQ_TMPCLAUDE_MIN_AGE_S` (default: 300)
+      - `CQ_TMPCLAUDE_DIRS` (extra dirs, split by `os.pathsep`)
+      - `CQ_TMPCLAUDE_PATTERNS` (comma-separated globs; default: tmpclaude-*-cwd)
     """
-    if not _env_bool("CCB_TMPCLAUDE_CLEAN", True):
+    if not _env_bool("CQ_TMPCLAUDE_CLEAN", True):
         return 0
 
-    patterns_raw = (os.environ.get("CCB_TMPCLAUDE_PATTERNS") or "").strip()
+    patterns_raw = (os.environ.get("CQ_TMPCLAUDE_PATTERNS") or "").strip()
     patterns = [p.strip() for p in patterns_raw.split(",") if p.strip()] if patterns_raw else ["tmpclaude-*-cwd"]
 
-    min_age_s = max(0.0, float(_env_float("CCB_TMPCLAUDE_MIN_AGE_S", 300.0)))
+    min_age_s = max(0.0, float(_env_float("CQ_TMPCLAUDE_MIN_AGE_S", 300.0)))
 
     dirs: list[Path] = []
-    if _env_bool("CCB_TMPCLAUDE_CLEAN_CWD", True):
+    if _env_bool("CQ_TMPCLAUDE_CLEAN_CWD", True):
         dirs.append(Path.cwd())
     try:
         dirs.append(Path(tempfile.gettempdir()))
     except Exception:
         pass
 
-    extra = (os.environ.get("CCB_TMPCLAUDE_DIRS") or "").strip()
+    extra = (os.environ.get("CQ_TMPCLAUDE_DIRS") or "").strip()
     if extra:
         for part in extra.split(os.pathsep):
             p = part.strip()
@@ -296,15 +295,15 @@ def _runtime_base_dir() -> Path:
 
 def _cleanup_stale_runtime_dirs(*, exclude: Path | None = None) -> int:
     """
-    Best-effort garbage collection for stale CCB runtime dirs under `$TMP/claude-ai-<user>/ai-*`.
+    Best-effort garbage collection for stale CQ runtime dirs under `$TMP/claude-ai-<user>/ai-*`.
 
     Normal exits already remove the current `runtime_dir`. This targets leftovers from crashes
     or hard kills (e.g. SIGKILL).
     """
-    if not _env_bool("CCB_RUNTIME_GC", True):
+    if not _env_bool("CQ_RUNTIME_GC", True):
         return 0
 
-    min_age_s = max(0.0, float(_env_float("CCB_RUNTIME_GC_MIN_AGE_S", 24 * 3600.0)))
+    min_age_s = max(0.0, float(_env_float("CQ_RUNTIME_GC_MIN_AGE_S", 24 * 3600.0)))
     base = _runtime_base_dir()
     try:
         if not base.exists() or not base.is_dir():
@@ -393,10 +392,10 @@ class AILauncher:
         except Exception:
             self.project_root = self.invocation_dir.absolute()
         self.session_id = f"ai-{int(time.time())}-{os.getpid()}"
-        self.ccb_pid = os.getpid()
-        self.project_id = compute_ccb_project_id(self.project_root)
+        self.cq_pid = os.getpid()
+        self.project_id = compute_cq_project_id(self.project_root)
         project_hash = (self.project_id or "")[:16] or "unknown"
-        self.project_run_dir = (Path.home() / ".cache" / "ccb" / "projects" / project_hash)
+        self.project_run_dir = (Path.home() / ".cache" / "cq" / "projects" / project_hash)
         self.temp_base = Path(tempfile.gettempdir())
         self.runtime_dir = self.temp_base / f"claude-ai-{getpass.getuser()}" / self.session_id
         self.runtime_dir.mkdir(parents=True, exist_ok=True)
@@ -410,21 +409,21 @@ class AILauncher:
         self.anchor_provider = None
         self.anchor_pane_id = None
         self._migrate_legacy_project_files()
-        os.environ["CCB_MANAGED"] = "1"
-        os.environ["CCB_PARENT_PID"] = str(self.ccb_pid)
-        os.environ.setdefault("CCB_RUN_DIR", str(self.project_run_dir))
+        os.environ["CQ_MANAGED"] = "1"
+        os.environ["CQ_PARENT_PID"] = str(self.cq_pid)
+        os.environ.setdefault("CQ_RUN_DIR", str(self.project_run_dir))
 
     def _managed_env_overrides(self) -> dict:
         env = {
-            "CCB_MANAGED": "1",
-            "CCB_PARENT_PID": str(self.ccb_pid),
+            "CQ_MANAGED": "1",
+            "CQ_PARENT_PID": str(self.cq_pid),
         }
-        if os.environ.get("CCB_RUN_DIR"):
-            env["CCB_RUN_DIR"] = os.environ["CCB_RUN_DIR"]
+        if os.environ.get("CQ_RUN_DIR"):
+            env["CQ_RUN_DIR"] = os.environ["CQ_RUN_DIR"]
         return env
 
     def _project_config_dir(self) -> Path:
-        return self.project_root / ".ccb_config"
+        return self.project_root / ".cq_config"
 
     def _project_session_file(self, filename: str) -> Path:
         cfg = self._project_config_dir()
@@ -432,7 +431,7 @@ class AILauncher:
 
     def _migrate_legacy_project_files(self) -> None:
         """
-        Move legacy project dotfiles from the project root into `.ccb_config/`.
+        Move legacy project dotfiles from the project root into `.cq_config/`.
 
         This keeps the project root clean while preserving backwards-compatible lookup
         (see `lib/session_utils.py:find_project_session_file`).
@@ -450,7 +449,7 @@ class AILauncher:
                 if not target.exists():
                     legacy.replace(target)
                     continue
-                # Keep both, but move the legacy one under `.ccb_config/` with a suffix.
+                # Keep both, but move the legacy one under `.cq_config/` with a suffix.
                 suffix = time.strftime("%Y%m%d%H%M%S")
                 legacy.replace(cfg / f"{name}.legacy.{suffix}")
             except Exception:
@@ -468,11 +467,11 @@ class AILauncher:
             if enabled is None:
                 enabled = True
             start_cmd = raw.get("start_cmd") or raw.get("command") or raw.get("cmd") or ""
-            title = raw.get("title") or raw.get("name") or "CCB-Cmd"
+            title = raw.get("title") or raw.get("name") or "CQ-Cmd"
             return {
                 "enabled": bool(enabled),
                 "start_cmd": str(start_cmd).strip(),
-                "title": str(title).strip() or "CCB-Cmd",
+                "title": str(title).strip() or "CQ-Cmd",
             }
         return {"enabled": False}
 
@@ -480,7 +479,7 @@ class AILauncher:
         cfg = self.cmd_config or {}
         if not cfg or not cfg.get("enabled"):
             return {"enabled": False}
-        title = (cfg.get("title") or "CCB-Cmd").strip() or "CCB-Cmd"
+        title = (cfg.get("title") or "CQ-Cmd").strip() or "CQ-Cmd"
         start_cmd = (cfg.get("start_cmd") or "").strip()
         if not start_cmd:
             start_cmd = self._default_cmd_start_cmd()
@@ -537,9 +536,9 @@ class AILauncher:
         try:
             backend = TmuxBackend()
             pane_id = backend.get_current_pane_id()
-            title = f"CCB-{provider.capitalize()}"
+            title = f"CQ-{provider.capitalize()}"
             backend.set_pane_title(pane_id, title)
-            backend.set_pane_user_option(pane_id, "@ccb_agent", provider.capitalize())
+            backend.set_pane_user_option(pane_id, "@cq_agent", provider.capitalize())
         except Exception:
             pass
 
@@ -553,7 +552,7 @@ class AILauncher:
 
     def _detect_terminal_type(self):
         # Forced by environment variable
-        forced = (os.environ.get("CCB_TERMINAL") or os.environ.get("CODEX_TERMINAL") or "").strip().lower()
+        forced = (os.environ.get("CQ_TERMINAL") or os.environ.get("CODEX_TERMINAL") or "").strip().lower()
         if forced in {"wezterm", "tmux"}:
             return forced
 
@@ -578,7 +577,7 @@ class AILauncher:
 
     def _set_tmux_ui_active(self, active: bool) -> None:
         """
-        Enable/disable CCB tmux UI theming for the *current tmux session*.
+        Enable/disable CQ tmux UI theming for the *current tmux session*.
 
         This is session-scoped and reversible (saves/restores user options) via helper scripts
         installed to `~/.local/bin/`.
@@ -587,13 +586,20 @@ class AILauncher:
             return
         if not os.environ.get("TMUX"):
             return
-        script = Path.home() / ".local" / "bin" / ("ccb-tmux-on.sh" if active else "ccb-tmux-off.sh")
-        if not script.exists():
+
+        candidates = ["cq-tmux-on.sh"] if active else ["cq-tmux-off.sh"]
+        script_path = None
+        for name in candidates:
+            found = shutil.which(name)
+            if found:
+                script_path = Path(found)
+                break
+        if not script_path or not script_path.exists():
             return
         try:
-            debug = os.environ.get("CCB_DEBUG") in ("1", "true", "yes")
+            debug = (os.environ.get("CQ_DEBUG") or "").strip().lower() in ("1", "true", "yes")
             cp = subprocess.run(
-                [str(script)],
+                [str(script_path)],
                 check=False,
                 capture_output=debug,
                 text=True,
@@ -605,7 +611,10 @@ class AILauncher:
                 err = (cp.stderr or "").strip()
                 detail = "\n".join([s for s in [out, err] if s])
                 if detail:
-                    print(f"⚠️ ccb tmux ui script failed (rc={cp.returncode}):\n{detail}", file=sys.stderr)
+                    print(
+                        f"⚠️ tmux ui script failed (rc={cp.returncode}):\n{detail}",
+                        file=sys.stderr,
+                    )
         except Exception:
             return
 
@@ -616,12 +625,12 @@ class AILauncher:
         if not shutil.which("osascript"):
             return False
         env = os.environ.copy()
-        env["CCB_WRAPPER_SCRIPT"] = str(script_file)
+        env["CQ_WRAPPER_SCRIPT"] = str(script_file)
         subprocess.Popen(
             [
                 "osascript",
                 "-e",
-                'tell application "Terminal" to do script "/bin/bash " & quoted form of (system attribute "CCB_WRAPPER_SCRIPT")',
+                'tell application "Terminal" to do script "/bin/bash " & quoted form of (system attribute "CQ_WRAPPER_SCRIPT")',
                 "-e",
                 'tell application "Terminal" to activate',
             ],
@@ -638,7 +647,7 @@ class AILauncher:
             print(f"   - {t('or_install_tmux')}")
             if shutil.which("tmux") and not (os.environ.get("TMUX") or os.environ.get("TMUX_PANE")):
                 print(f"   - {t('tmux_installed_not_inside')}")
-            print(f"   - {t('or_set_ccb_terminal')}")
+            print(f"   - {t('or_set_cq_terminal')}")
             return None
 
         # WezTerm mode: no tmux dependency
@@ -662,7 +671,7 @@ class AILauncher:
         if not (os.environ.get("TMUX") or os.environ.get("TMUX_PANE")):
             print(f"❌ {t('tmux_installed_not_inside')}", file=sys.stderr)
             print(f"💡 Run: tmux", file=sys.stderr)
-            print(f"   Then: {' '.join(['ccb', *sys.argv[1:]])}", file=sys.stderr)
+            print(f"   Then: {' '.join(['cq', *sys.argv[1:]])}", file=sys.stderr)
             return None
 
         print(f"🚀 {t('starting_backend', provider=provider.capitalize(), terminal='tmux')}")
@@ -699,7 +708,7 @@ class AILauncher:
             except StopIteration:
                 use_parent = None
 
-        pane_title_marker = f"CCB-{provider.capitalize()}"
+        pane_title_marker = f"CQ-{provider.capitalize()}"
         title_cmd = _build_pane_title_cmd(pane_title_marker)
         env_overrides = self._managed_env_overrides()
         full_cmd = title_cmd + self._build_env_prefix(env_overrides) + _build_export_path_cmd(self.script_dir / "bin") + start_cmd
@@ -760,7 +769,7 @@ class AILauncher:
         cfg = self._project_config_dir()
         if cfg.is_dir():
             return True
-        print("❌ Missing required project config directory: .ccb_config", file=sys.stderr)
+        print("❌ Missing required project config directory: .cq_config", file=sys.stderr)
         print(f"   project_root: {self.project_root}", file=sys.stderr)
         print(f"   cwd:          {Path.cwd()}", file=sys.stderr)
         print(f"💡 Fix: mkdir -p {cfg}", file=sys.stderr)
@@ -830,9 +839,9 @@ class AILauncher:
             data["claude_session_id"] = session_id
         data["session_id"] = self.session_id
         try:
-            data["ccb_project_id"] = compute_ccb_project_id(work_dir)
+            data["cq_project_id"] = compute_cq_project_id(work_dir)
         except Exception:
-            data["ccb_project_id"] = data.get("ccb_project_id")
+            data["cq_project_id"] = data.get("cq_project_id")
         data["work_dir"] = str(work_dir)
         data["work_dir_norm"] = _normalize_path_for_match(str(work_dir))
         data["start_dir"] = str(self.invocation_dir)
@@ -854,8 +863,8 @@ class AILauncher:
             try:
                 upsert_registry(
                     {
-                        "ccb_session_id": self.session_id,
-                        "ccb_project_id": compute_ccb_project_id(self.project_root),
+                        "cq_session_id": self.session_id,
+                        "cq_project_id": compute_cq_project_id(self.project_root),
                         "work_dir": str(self.project_root),
                         "terminal": terminal or self.terminal_type,
                         "providers": {
@@ -901,7 +910,7 @@ class AILauncher:
             logs = []
 
         scan_limit = 400
-        raw_limit = (os.environ.get("CCB_CODEX_SCAN_LIMIT") or "").strip()
+        raw_limit = (os.environ.get("CQ_CODEX_SCAN_LIMIT") or "").strip()
         if raw_limit:
             try:
                 scan_limit = max(100, min(20000, int(raw_limit)))
@@ -976,8 +985,8 @@ class AILauncher:
         cwd = str(Path.cwd())
         section_header = f'[projects."{_toml_escape_basic_string(cwd)}"]'
 
-        ccb_begin = "# --- BEGIN CCB: codex auto-approval ---"
-        ccb_end = "# --- END CCB: codex auto-approval ---"
+        cq_begin = "# --- BEGIN CQ: codex auto-approval ---"
+        cq_end = "# --- END CQ: codex auto-approval ---"
         desired = [
             'trust_level = "trusted"',
             'approval_policy = "never"',
@@ -989,9 +998,9 @@ class AILauncher:
 
             def _migrate_legacy_full_auto(text: str) -> tuple[str, bool]:
                 """
-                Older CCB versions wrote `sandbox_mode = "full-auto"` into `~/.codex/config.toml`.
+                Older CQ versions wrote `sandbox_mode = "full-auto"` into `~/.codex/config.toml`.
                 Codex rejects this value (valid variants: read-only/workspace-write/danger-full-access),
-                so we migrate it to `danger-full-access` to match CCB's `-a/--auto` intent.
+                so we migrate it to `danger-full-access` to match CQ's `-a/--auto` intent.
                 """
                 lines = (text or "").splitlines(keepends=True)
                 if not lines:
@@ -1092,9 +1101,9 @@ class AILauncher:
                 begin_idx = None
                 end_idx = None
                 for i, ln in enumerate(lines):
-                    if ln.strip() == ccb_begin:
+                    if ln.strip() == cq_begin:
                         begin_idx = i
-                    if ln.strip() == ccb_end:
+                    if ln.strip() == cq_end:
                         end_idx = i
                         break
 
@@ -1109,15 +1118,15 @@ class AILauncher:
                         if span <= 12:
                             insert_before = min(key_lines)
                             insert_after = max(key_lines) + 1
-                            lines.insert(insert_before, ccb_begin + "\n")
-                            lines.insert(insert_after + 1, ccb_end + "\n")
+                            lines.insert(insert_before, cq_begin + "\n")
+                            lines.insert(insert_after + 1, cq_end + "\n")
                             changed = True
                     return "".join(lines), changed
 
                 if not missing:
                     return section_text, False
 
-                block_lines = [ccb_begin + "\n", *[m + "\n" for m in missing], ccb_end + "\n"]
+                block_lines = [cq_begin + "\n", *[m + "\n" for m in missing], cq_end + "\n"]
 
                 if begin_idx is not None and end_idx is not None and begin_idx < end_idx:
                     # Insert missing keys right before end marker.
@@ -1125,7 +1134,7 @@ class AILauncher:
                     changed = True
                     return "".join(lines), changed
 
-                # No existing block: append a new CCB-managed block at end of this section.
+                # No existing block: append a new CQ-managed block at end of this section.
                 insert_at = len(lines)
                 while insert_at > 0 and lines[insert_at - 1].strip() == "":
                     insert_at -= 1
@@ -1145,8 +1154,8 @@ class AILauncher:
                     content = content[:start] + updated_section + content[end:]
                     changed_any = True
             else:
-                # No existing section: append a new CCB-managed project section at end of file.
-                entry = "\n".join([section_header, ccb_begin, *desired, ccb_end]) + "\n"
+                # No existing section: append a new CQ-managed project section at end of file.
+                entry = "\n".join([section_header, cq_begin, *desired, cq_end]) + "\n"
                 content = content.rstrip() + "\n\n" + entry
                 changed_any = True
 
@@ -1241,7 +1250,7 @@ class AILauncher:
 
         env_overrides = self._managed_env_overrides()
         start_cmd = self._build_env_prefix(env_overrides) + _build_export_path_cmd(self.script_dir / "bin") + self._build_codex_start_cmd()
-        pane_title_marker = "CCB-Codex"
+        pane_title_marker = "CQ-Codex"
 
         backend = TmuxBackend()
 
@@ -1266,7 +1275,7 @@ class AILauncher:
         pane_id = backend.create_pane("", str(Path.cwd()), direction=use_direction, percent=50, parent_pane=use_parent)
         backend.respawn_pane(pane_id, cmd=start_cmd, cwd=str(Path.cwd()), remain_on_exit=True)
         backend.set_pane_title(pane_id, pane_title_marker)
-        backend.set_pane_user_option(pane_id, "@ccb_agent", "Codex")
+        backend.set_pane_user_option(pane_id, "@cq_agent", "Codex")
 
         self.tmux_panes["codex"] = pane_id
 
@@ -1305,7 +1314,7 @@ class AILauncher:
     ) -> str | None:
         if not cmd_settings.get("enabled"):
             return None
-        title = (cmd_settings.get("title") or "CCB-Cmd").strip() or "CCB-Cmd"
+        title = (cmd_settings.get("title") or "CQ-Cmd").strip() or "CQ-Cmd"
         start_cmd = (cmd_settings.get("start_cmd") or "").strip() or self._default_cmd_start_cmd()
         full_cmd = (
             _build_pane_title_cmd(title)
@@ -1327,7 +1336,7 @@ class AILauncher:
             pane_id = backend.create_pane("", str(Path.cwd()), direction=use_direction, percent=50, parent_pane=use_parent)
             backend.respawn_pane(pane_id, cmd=full_cmd, cwd=str(Path.cwd()), remain_on_exit=True)
             backend.set_pane_title(pane_id, title)
-            backend.set_pane_user_option(pane_id, "@ccb_agent", "Cmd")
+            backend.set_pane_user_option(pane_id, "@cq_agent", "Cmd")
             self.extra_panes["cmd"] = pane_id
 
         print(f"✅ Started cmd pane ({pane_id})")
@@ -1342,12 +1351,12 @@ class AILauncher:
             print("❌ Unable to determine current pane id for Codex", file=sys.stderr)
             return 1
 
-        pane_title_marker = "CCB-Codex"
+        pane_title_marker = "CQ-Codex"
         if self.terminal_type == "tmux":
             try:
                 backend = TmuxBackend()
                 backend.set_pane_title(pane_id, pane_title_marker)
-                backend.set_pane_user_option(pane_id, "@ccb_agent", "Codex")
+                backend.set_pane_user_option(pane_id, "@cq_agent", "Codex")
             except Exception:
                 pass
 
@@ -1420,7 +1429,7 @@ class AILauncher:
         work_dir = self.project_root
         data.update({
             "session_id": self.session_id,
-            "ccb_project_id": compute_ccb_project_id(work_dir),
+            "cq_project_id": compute_cq_project_id(work_dir),
             "runtime_dir": str(runtime),
             "terminal": self.terminal_type,
             "tmux_session": tmux_session,
@@ -1442,8 +1451,8 @@ class AILauncher:
             return False
         try:
             upsert_registry({
-                "ccb_session_id": self.session_id,
-                "ccb_project_id": compute_ccb_project_id(self.project_root),
+                "cq_session_id": self.session_id,
+                "cq_project_id": compute_cq_project_id(self.project_root),
                 "work_dir": str(self.project_root),
                 "terminal": self.terminal_type,
                 "providers": {
@@ -1462,10 +1471,10 @@ class AILauncher:
         if not claude_pane_id:
             return False
         record = {
-            "ccb_session_id": self.session_id,
+            "cq_session_id": self.session_id,
             "claude_pane_id": claude_pane_id,
             "codex_pane_id": codex_pane_id,
-            "ccb_project_id": compute_ccb_project_id(self.project_root),
+            "cq_project_id": compute_cq_project_id(self.project_root),
             "work_dir": str(Path.cwd()),
             "terminal": self.terminal_type,
             "providers": {
@@ -1475,7 +1484,7 @@ class AILauncher:
         }
         ok = upsert_registry(record)
         if not ok:
-            print("⚠️ Failed to update CCB registry", file=sys.stderr)
+            print("⚠️ Failed to update CQ registry", file=sys.stderr)
         return ok
 
     def _sync_cend_registry(self) -> None:
@@ -1681,7 +1690,7 @@ class AILauncher:
 
         start_cmd = " ".join(cmd_parts)
         full_cmd = (
-            _build_pane_title_cmd("CCB-Claude")
+            _build_pane_title_cmd("CQ-Claude")
             + self._build_env_prefix(env_overrides)
             + _build_export_path_cmd(self.script_dir / "bin")
             + start_cmd
@@ -1698,8 +1707,8 @@ class AILauncher:
             backend = TmuxBackend()
             pane_id = backend.create_pane("", run_cwd, direction=use_direction, percent=50, parent_pane=use_parent)
             backend.respawn_pane(pane_id, cmd=full_cmd, cwd=run_cwd, remain_on_exit=True)
-            backend.set_pane_title(pane_id, "CCB-Claude")
-            backend.set_pane_user_option(pane_id, "@ccb_agent", "Claude")
+            backend.set_pane_title(pane_id, "CQ-Claude")
+            backend.set_pane_user_option(pane_id, "@cq_agent", "Claude")
             self.tmux_panes["claude"] = pane_id
 
         try:
@@ -1707,7 +1716,7 @@ class AILauncher:
                 session_id=self._read_local_claude_session_id(),
                 active=True,
                 pane_id=str(pane_id or ""),
-                pane_title_marker="CCB-Claude",
+                pane_title_marker="CQ-Claude",
                 terminal=self.terminal_type,
             )
         except Exception:
@@ -1787,7 +1796,7 @@ class AILauncher:
     def run_up(self) -> int:
         git_info = _get_git_info()
         version_str = f"v{VERSION}" + (f" ({git_info})" if git_info else "")
-        print(f"🚀 Claude Code Bridge {version_str}")
+        print(f"🚀 Code Quorum {version_str}")
         print(f"📅 {time.strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"🔌 Backends: {', '.join(self.providers)}")
         print("=" * 50)
@@ -1809,14 +1818,14 @@ class AILauncher:
             print(f"   - {t('or_install_tmux')}", file=sys.stderr)
             if shutil.which("tmux"):
                 print(f"   - {t('tmux_installed_not_inside')}", file=sys.stderr)
-            print(f"   - {t('or_set_ccb_terminal')}", file=sys.stderr)
+            print(f"   - {t('or_set_cq_terminal')}", file=sys.stderr)
             return 2
 
         if not self._require_project_config_dir():
             return 2
 
         if not self.providers:
-            print("❌ No providers configured. Define providers in ccb.config or pass them on the command line.", file=sys.stderr)
+            print("❌ No providers configured. Define providers in cq.config or pass them on the command line.", file=sys.stderr)
             return 2
 
         self.anchor_provider = self.providers[-1]
@@ -1859,7 +1868,7 @@ class AILauncher:
         # Best-effort cleanup of leftover `tmpclaude-*-cwd` artifacts (can be disabled via env).
         try:
             removed = _cleanup_tmpclaude_artifacts()
-            if removed and os.environ.get("CCB_DEBUG") in ("1", "true", "yes"):
+            if removed and os.environ.get("CQ_DEBUG") in ("1", "true", "yes"):
                 print(f"🧹 Cleaned tmpclaude artifacts: {removed}")
         except Exception:
             pass
@@ -1867,12 +1876,12 @@ class AILauncher:
         # Best-effort cleanup of stale runtime dirs in temp (crash leftovers).
         try:
             removed_runtime = _cleanup_stale_runtime_dirs(exclude=self.runtime_dir)
-            if removed_runtime and os.environ.get("CCB_DEBUG") in ("1", "true", "yes"):
+            if removed_runtime and os.environ.get("CQ_DEBUG") in ("1", "true", "yes"):
                 print(f"🧹 Cleaned stale runtime dirs: {removed_runtime}")
         except Exception:
             pass
 
-        # tmux-only: enable CCB UI theming for the current session while CCB is running.
+        # tmux-only: enable CQ UI theming for the current session while CQ is running.
         try:
             self._set_tmux_ui_active(True)
         except Exception:
@@ -1891,7 +1900,7 @@ class AILauncher:
                     session_id=self._read_local_claude_session_id(),
                     active=True,
                     pane_id=str(self.anchor_pane_id or ""),
-                    pane_title_marker="CCB-Claude",
+                    pane_title_marker="CQ-Claude",
                     terminal=self.terminal_type,
                 )
             except Exception:
@@ -1941,7 +1950,7 @@ def cmd_start(args):
     # Enforce terminal environment requirement
     terminal = detect_terminal()
     if terminal is None:
-        print("[ERROR] CCB must run inside tmux or WezTerm.", file=sys.stderr)
+        print("[ERROR] CQ must run inside tmux or WezTerm.", file=sys.stderr)
         print("", file=sys.stderr)
         print("Please start tmux first:", file=sys.stderr)
         print("  tmux", file=sys.stderr)
@@ -1989,10 +1998,10 @@ def cmd_start(args):
 
     def _find_parent_anchor_dir(cwd: Path) -> Path | None:
         """
-        Find the nearest ancestor `.ccb_config/` (project anchor) directory.
+        Find the nearest ancestor `.cq_config/` (project anchor) directory.
 
         Used only to block auto-creation when a parent anchor exists. Users can still
-        create a local `.ccb_config/` manually to treat this directory as a new project.
+        create a local `.cq_config/` manually to treat this directory as a new project.
         """
         try:
             start = cwd.resolve()
@@ -2000,7 +2009,7 @@ def cmd_start(args):
             start = cwd.absolute()
 
         for parent in start.parents:
-            candidate = parent / ".ccb_config"
+            candidate = parent / ".cq_config"
             if not candidate.is_dir():
                 continue
             # Ignore anchors at $HOME or filesystem root (too broad / likely accidental).
@@ -2011,9 +2020,9 @@ def cmd_start(args):
         return None
 
     work_dir = Path.cwd()
-    cfg = work_dir / ".ccb_config"
+    cfg = work_dir / ".cq_config"
     if cfg.exists() and not cfg.is_dir():
-        print("❌ Invalid .ccb_config: exists but is not a directory", file=sys.stderr)
+        print("❌ Invalid .cq_config: exists but is not a directory", file=sys.stderr)
         print(f"   path: {cfg}", file=sys.stderr)
         print("💡 Fix: remove it or rename it, then retry.", file=sys.stderr)
         return 2
@@ -2024,19 +2033,19 @@ def cmd_start(args):
         if parent_anchor:
             project_root = parent_anchor.parent
             print(
-                "❌ .ccb_config not found in current directory, but an existing project anchor was found in a parent directory.",
+                "❌ .cq_config not found in current directory, but an existing project anchor was found in a parent directory.",
                 file=sys.stderr,
             )
             print(f"   cwd:         {Path.cwd()}", file=sys.stderr)
             print(f"   project_root:{project_root}", file=sys.stderr)
             print("💡 Auto-create blocked to avoid accidental nesting.", file=sys.stderr)
-            print("💡 If you want this directory to be a separate project, create .ccb_config here:", file=sys.stderr)
-            print("   mkdir .ccb_config", file=sys.stderr)
+            print("💡 If you want this directory to be a separate project, create .cq_config here:", file=sys.stderr)
+            print("   mkdir .cq_config", file=sys.stderr)
             return 2
 
-        if is_dangerous and not _env_truthy("CCB_INIT_PROJECT_DANGEROUS"):
-            print(f"❌ Refusing to auto-create .ccb_config in {danger_reason}.", file=sys.stderr)
-            print("💡 If you really intend to do this, set CCB_INIT_PROJECT_DANGEROUS=1 and retry.", file=sys.stderr)
+        if is_dangerous and not _env_truthy("CQ_INIT_PROJECT_DANGEROUS"):
+            print(f"❌ Refusing to auto-create .cq_config in {danger_reason}.", file=sys.stderr)
+            print("💡 If you really intend to do this, set CQ_INIT_PROJECT_DANGEROUS=1 and retry.", file=sys.stderr)
             return 2
         try:
             cfg.mkdir(parents=False, exist_ok=True)
@@ -2045,20 +2054,23 @@ def cmd_start(args):
             print(f"❌ Failed to create {cfg}: {exc}", file=sys.stderr)
             return 2
 
-    # Enforce single ccb instance per directory.
+    # Enforce a single launcher instance per directory.
     lock_cwd = str(Path.cwd().resolve())
-    ccb_lock = ProviderLock("ccb", timeout=0.1, cwd=lock_cwd)
-    if not ccb_lock.try_acquire():
+    cq_lock = ProviderLock("cq", timeout=0.1, cwd=lock_cwd)
+    if not cq_lock.try_acquire():
         pid = ""
         try:
-            pid = ccb_lock.lock_file.read_text(encoding="utf-8").strip()
+            pid = cq_lock.lock_file.read_text(encoding="utf-8").strip()
         except Exception:
             pid = ""
         pid_msg = f" (pid {pid})" if pid else ""
-        print(f"❌ Another ccb instance is already running for this directory{pid_msg}.", file=sys.stderr)
-        print("💡 Only one ccb instance is allowed per directory.", file=sys.stderr)
+        print(
+            f"❌ Another cq instance is already running for this directory{pid_msg}.",
+            file=sys.stderr,
+        )
+        print("💡 Only one cq instance is allowed per directory.", file=sys.stderr)
         return 2
-    atexit.register(ccb_lock.release)
+    atexit.register(cq_lock.release)
 
     providers, cmd_enabled = _parse_providers_with_cmd(args.providers or [])
     config = load_start_config(work_dir)
@@ -2079,7 +2091,7 @@ def cmd_start(args):
         providers = _parse_providers([str(p) for p in raw_providers])
 
     if not providers:
-        print("❌ No providers configured. Define providers in ccb.config or pass them on the command line.", file=sys.stderr)
+        print("❌ No providers configured. Define providers in cq.config or pass them on the command line.", file=sys.stderr)
         return 2
 
     flags = config_data.get("flags") if isinstance(config_data.get("flags"), dict) else {}
@@ -2103,7 +2115,7 @@ def cmd_start(args):
 
 
 def _find_all_zombie_sessions() -> list[dict]:
-    """Find all zombie tmux sessions (CCB sessions whose parent process is dead)."""
+    """Find all zombie tmux sessions (CQ sessions whose parent process is dead)."""
     import re
     pattern = re.compile(r"^(codex|claude)-(\d+)-")
     zombies = []
@@ -2260,8 +2272,8 @@ def _parse_providers(values: list[str], *, allow_unknown: bool = False) -> list[
     Parse providers from argv.
 
     Accept both:
-      - space-separated: `ccb codex claude`
-      - comma-separated: `ccb codex,claude`
+      - space-separated: `cq codex claude`
+      - comma-separated: `cq codex,claude`
 
     Returns a de-duplicated list preserving order.
     """
@@ -2285,7 +2297,7 @@ def _parse_providers(values: list[str], *, allow_unknown: bool = False) -> list[
 
     if unknown and not allow_unknown:
         print(f"❌ invalid provider(s): {', '.join(unknown)}", file=sys.stderr)
-        print("💡 use: ccb codex claude  (spaces)  or  ccb codex,claude  (commas)", file=sys.stderr)
+        print("💡 use: cq codex claude  (spaces)  or  cq codex,claude  (commas)", file=sys.stderr)
         print("💡 allowed: codex, claude", file=sys.stderr)
         return []
 
@@ -2321,7 +2333,7 @@ def _parse_providers_with_cmd(values: list[str]) -> tuple[list[str], bool]:
 
     if unknown:
         print(f"❌ invalid provider(s): {', '.join(unknown)}", file=sys.stderr)
-        print("💡 use: ccb codex claude cmd  (spaces)  or  ccb codex,claude,cmd  (commas)", file=sys.stderr)
+        print("💡 use: cq codex claude cmd  (spaces)  or  cq codex,claude,cmd  (commas)", file=sys.stderr)
         print("💡 allowed: codex, claude, cmd", file=sys.stderr)
         return [], cmd_enabled
 
@@ -2331,10 +2343,10 @@ def _parse_providers_with_cmd(values: list[str]) -> tuple[list[str], bool]:
 def _get_version_info(dir_path: Path) -> dict:
     """Get commit hash, date and version from install directory"""
     info = {"commit": None, "date": None, "version": None}
-    ccb_file = dir_path / "ccb"
-    if ccb_file.exists():
+    launcher_file = dir_path / "cq"
+    if launcher_file.exists():
         try:
-            content = ccb_file.read_text(encoding='utf-8', errors='replace')
+            content = launcher_file.read_text(encoding='utf-8', errors='replace')
             for line in content.split('\n')[:60]:
                 line = line.strip()
                 if line.startswith('VERSION') and '=' in line:
@@ -2379,10 +2391,10 @@ def _get_remote_version_info() -> dict | None:
     import urllib.request
     import ssl
 
-    api_url = "https://api.github.com/repos/stefanc-ai2/claude_code_bridge/commits/main"
+    api_url = "https://api.github.com/repos/stefanc-ai2/code-quorum/commits/main"
     try:
         ctx = ssl.create_default_context()
-        req = urllib.request.Request(api_url, headers={"User-Agent": "ccb"})
+        req = urllib.request.Request(api_url, headers={"User-Agent": "cq"})
         with urllib.request.urlopen(req, context=ctx, timeout=5) as resp:
             data = json.loads(resp.read().decode('utf-8'))
             commit = data.get("sha", "")[:7]
@@ -2414,8 +2426,8 @@ def _get_available_versions() -> list[str]:
     import urllib.request
     import ssl
 
-    repo_url = "https://github.com/stefanc-ai2/claude_code_bridge"
-    api_url = "https://api.github.com/repos/stefanc-ai2/claude_code_bridge/tags"
+    repo_url = "https://github.com/stefanc-ai2/code-quorum"
+    api_url = "https://api.github.com/repos/stefanc-ai2/code-quorum/tags"
     versions = []
 
     def parse_api_response(data):
@@ -2444,7 +2456,7 @@ def _get_available_versions() -> list[str]:
 
     try:
         ctx = ssl.create_default_context()
-        req = urllib.request.Request(api_url, headers={"User-Agent": "ccb"})
+        req = urllib.request.Request(api_url, headers={"User-Agent": "cq"})
         with urllib.request.urlopen(req, context=ctx, timeout=10) as resp:
             data = json.loads(resp.read().decode('utf-8'))
             versions = parse_api_response(data)
@@ -2501,14 +2513,17 @@ def cmd_version(args):
     # Candidate directories (highest priority first)
     candidates = [
         script_root,  # current script directory
-        Path(os.environ.get("CODEX_INSTALL_PREFIX", "")).expanduser() if os.environ.get("CODEX_INSTALL_PREFIX") else None,
-        Path.home() / ".local/share/codex-dual",  # Linux/macOS
+        Path(os.environ.get("CQ_INSTALL_PREFIX", "")).expanduser() if os.environ.get("CQ_INSTALL_PREFIX") else None,
+        Path.home() / ".local/share/code-quorum",  # Linux/macOS
+        Path.home() / ".local/share/codex-dual",  # legacy
     ]
 
-    # Choose the first directory containing ccb.
+    # Choose the first directory containing cq.
     install_dir = None
     for candidate in candidates:
-        if candidate and (candidate / "ccb").exists():
+        if not candidate:
+            continue
+        if (candidate / "cq").exists():
             install_dir = candidate
             break
     if not install_dir:
@@ -2517,7 +2532,7 @@ def cmd_version(args):
     local_info = _get_version_info(install_dir)
     local_str = _format_version_info(local_info)
 
-    print(f"ccb (Claude Code Bridge) {local_str}")
+    print(f"cq (Code Quorum) {local_str}")
     print(f"Install path: {install_dir}")
 
     print("\nChecking for updates...")
@@ -2531,7 +2546,7 @@ def cmd_version(args):
         else:
             remote_str = f"{remote_info['commit']} {remote_info.get('date', '')}"
             print(f"📦 Update available: {remote_str}")
-            print(f"   Run: ccb update")
+            print("   Run: cq update")
     else:
         print("⚠️  Unable to compare versions")
 
@@ -2539,9 +2554,9 @@ def cmd_version(args):
 
 
 def cmd_update(args):
-    """Update ccb to latest or specified version"""
+    """Update cq to latest or specified version"""
     if getattr(args, "target", None) == "cca":
-        print("❌ `ccb update cca` is no longer supported.", file=sys.stderr)
+        print("❌ `cq update cca` is no longer supported.", file=sys.stderr)
         return 2
 
     import urllib.request
@@ -2550,11 +2565,11 @@ def cmd_update(args):
 
     # Prefer the directory where this script resides (installed copy), then fall back to env/default.
     script_root = Path(__file__).resolve().parent
-    default_install_dir = Path.home() / ".local/share/codex-dual"
-    install_dir = Path(os.environ.get("CODEX_INSTALL_PREFIX") or default_install_dir).expanduser()
+    default_install_dir = Path.home() / ".local/share/code-quorum"
+    install_dir = Path(os.environ.get("CQ_INSTALL_PREFIX") or default_install_dir).expanduser()
     if (script_root / "install.sh").exists():
         install_dir = script_root
-    repo_url = "https://github.com/stefanc-ai2/claude_code_bridge"
+    repo_url = "https://github.com/stefanc-ai2/code-quorum"
 
     # Parse version target
     target_version = None
@@ -2574,7 +2589,7 @@ def cmd_update(args):
             print(f"📌 Target version: v{target_version}")
         else:
             print(f"❌ Invalid version format: {args.target}")
-            print("   Examples: ccb update 4, ccb update 4.1, ccb update 4.1.3")
+            print("   Examples: cq update 4, cq update 4.1, cq update 4.1.3")
             return 1
 
     # Get current version info before update
@@ -2623,7 +2638,7 @@ def cmd_update(args):
 
     def _pick_temp_base_dir() -> Path:
         candidates: list[Path] = []
-        for key in ("CCB_TMPDIR", "TMPDIR", "TEMP", "TMP"):
+        for key in ("CQ_TMPDIR", "TMPDIR", "TEMP", "TMP"):
             value = (os.environ.get(key) or "").strip()
             if value:
                 candidates.append(Path(value).expanduser())
@@ -2636,7 +2651,7 @@ def cmd_update(args):
                 Path("/tmp"),
                 Path("/var/tmp"),
                 Path("/usr/tmp"),
-                Path.home() / ".cache" / "ccb" / "tmp",
+                Path.home() / ".cache" / "cq" / "tmp",
                 install_dir / ".tmp",
                 Path.cwd() / ".tmp",
             ]
@@ -2645,7 +2660,7 @@ def cmd_update(args):
         for base in candidates:
             try:
                 base.mkdir(parents=True, exist_ok=True)
-                probe = base / f".ccb_tmp_probe_{os.getpid()}_{int(time.time() * 1000)}"
+                probe = base / f".cq_tmp_probe_{os.getpid()}_{int(time.time() * 1000)}"
                 probe.write_bytes(b"1")
                 probe.unlink(missing_ok=True)
                 return base
@@ -2656,22 +2671,22 @@ def cmd_update(args):
             "❌ No usable temporary directory found.\n"
             "Fix options:\n"
             "  - Create /tmp: sudo mkdir -p /tmp && sudo chmod 1777 /tmp\n"
-            "  - Or set TMPDIR/CCB_TMPDIR to a writable path (e.g. export TMPDIR=$HOME/.cache/tmp)"
+            "  - Or set TMPDIR/CQ_TMPDIR to a writable path (e.g. export TMPDIR=$HOME/.cache/tmp)"
         )
 
     # Method 2: Download tarball
     if target_version:
         tarball_url = f"{repo_url}/archive/refs/tags/v{target_version}.tar.gz"
-        extracted_name = f"claude_code_bridge-{target_version}"
+        extracted_name = f"code-quorum-{target_version}"
     else:
         tarball_url = f"{repo_url}/archive/refs/heads/main.tar.gz"
-        extracted_name = "claude_code_bridge-main"
+        extracted_name = "code-quorum-main"
     try:
         tmp_base = _pick_temp_base_dir()
     except Exception as exc:
         print(str(exc))
         return 1
-    tmp_dir = tmp_base / "ccb_update"
+    tmp_dir = tmp_base / "cq_update"
 
     try:
         if target_version:
@@ -2730,7 +2745,7 @@ def cmd_update(args):
 
         print("🔧 Installing...")
         env = os.environ.copy()
-        env["CODEX_INSTALL_PREFIX"] = str(install_dir)
+        env["CQ_INSTALL_PREFIX"] = str(install_dir)
         subprocess.run([str(extracted_dir / "install.sh"), "install"], check=True, env=env)
 
         # Show upgrade info
@@ -2781,7 +2796,7 @@ def _cleanup_claude_files() -> None:
             except Exception:
                 pass
 
-    # Remove CCB blocks and legacy collaboration rules.
+    # Remove CQ blocks and legacy collaboration rules.
     if claude_md.is_file():
         try:
             content = claude_md.read_text(encoding="utf-8", errors="replace")
@@ -2790,7 +2805,7 @@ def _cleanup_claude_files() -> None:
         if content:
             before = content
             content = re.sub(
-                r"\n?<!-- CCB_CONFIG_START -->.*?<!-- CCB_CONFIG_END -->\n?",
+                r"\n?<!-- CQ_CONFIG_START -->.*?<!-- CQ_CONFIG_END -->\n?",
                 "\n",
                 content,
                 flags=re.DOTALL,
@@ -2806,7 +2821,7 @@ def _cleanup_claude_files() -> None:
             if content != before.strip():
                 claude_md.write_text((content + "\n") if content else "", encoding="utf-8")
 
-    # Remove CCB permissions from settings.json.
+    # Remove CQ permissions from settings.json.
     if settings_json.is_file():
         try:
             data = json.loads(settings_json.read_text(encoding="utf-8", errors="replace"))
@@ -2837,18 +2852,17 @@ def _cleanup_claude_files() -> None:
 
 def _find_install_dir() -> Path:
     script_root = Path(__file__).resolve().parent
-    if (script_root / "install.sh").exists():
-        return script_root
-
-    candidates = []
-    env_prefix = (os.environ.get("CODEX_INSTALL_PREFIX") or "").strip()
+    candidates: list[Path] = []
+    env_prefix = (os.environ.get("CQ_INSTALL_PREFIX") or "").strip()
     if env_prefix:
         candidates.append(Path(env_prefix).expanduser())
 
-    candidates.append(Path.home() / ".local/share/codex-dual")
+    candidates.append(Path.home() / ".local/share/code-quorum")
+    candidates.append(Path.home() / ".local/share/codex-dual")  # legacy
+    candidates.append(script_root)
 
     for candidate in candidates:
-        if candidate and (candidate / "ccb").exists():
+        if candidate and ((candidate / "cq").exists() or (candidate / "cq").exists()):
             return candidate
     return script_root
 
@@ -2860,7 +2874,10 @@ def _run_installer(action: str) -> int:
         print(f"❌ install.sh not found in {install_dir}", file=sys.stderr)
         return 1
     env = os.environ.copy()
-    env["CODEX_INSTALL_PREFIX"] = str(install_dir)
+    # Only force CQ_INSTALL_PREFIX when it looks like we're running from an installed copy.
+    # If invoked from a git checkout, overriding would risk deleting the checkout directory on uninstall.
+    if not (install_dir / ".git").exists():
+        env["CQ_INSTALL_PREFIX"] = str(install_dir)
     return subprocess.run(["bash", str(script), action], env=env).returncode
 
 
@@ -2883,12 +2900,12 @@ def main():
         argv = ["version"]
 
     if argv and argv[0] == "up":
-        print("❌ `ccb up` is no longer supported.", file=sys.stderr)
-        print("💡 Use: ccb [providers...]  (or configure ccb.config)", file=sys.stderr)
+        print("❌ `cq up` is no longer supported.", file=sys.stderr)
+        print("💡 Use: cq [providers...]  (or configure cq.config)", file=sys.stderr)
         return 2
 
     if argv and argv[0] in {"kill", "update", "version", "uninstall", "reinstall"}:
-        parser = argparse.ArgumentParser(description="Claude AI unified launcher", add_help=True)
+        parser = argparse.ArgumentParser(description="Code Quorum launcher", add_help=True)
         subparsers = parser.add_subparsers(dest="command", help="Subcommands")
 
         kill_parser = subparsers.add_parser("kill", help="Terminate session or clean up zombies")
@@ -2901,8 +2918,8 @@ def main():
                                    help="Version like '4', '4.1', '4.1.3' (optional)")
 
         subparsers.add_parser("version", help="Show version and check for updates")
-        subparsers.add_parser("uninstall", help="Uninstall ccb and clean configs")
-        subparsers.add_parser("reinstall", help="Reinstall ccb and refresh configs")
+        subparsers.add_parser("uninstall", help="Uninstall cq and clean configs")
+        subparsers.add_parser("reinstall", help="Reinstall cq and refresh configs")
 
         args = parser.parse_args(argv)
         if args.command == "kill":
@@ -2919,9 +2936,9 @@ def main():
         return 1
 
     start_parser = argparse.ArgumentParser(
-        description="Claude AI unified launcher",
+        description="Code Quorum launcher",
         add_help=True,
-        epilog="Other commands: ccb update | ccb version | ccb kill | ccb uninstall | ccb reinstall",
+        epilog="Other commands: cq update | cq version | cq kill | cq uninstall | cq reinstall",
     )
     start_parser.add_argument(
         "providers",

@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """
-ccb-mounted - Check which CCB providers are mounted.
+cq-mounted - Check which Code Quorum providers are mounted.
 
 A provider is "mounted" if:
-1. Session file exists (.ccb_config/.{provider}-session or .{provider}-session) and is active
+1. Session file exists (.cq_config/.{provider}-session or .{provider}-session) and is active
 2. Pane is reachable/alive (best-effort) - OR socket access is blocked (sandbox mode)
 
 Usage:
-    ccb-mounted [CWD] [--json|--simple] [--include-inactive]
+    cq-mounted [CWD] [--json|--simple] [--include-inactive]
 
 Examples:
-    ccb-mounted
-    ccb-mounted --simple
-    ccb-mounted /path/to/project --json
+    cq-mounted
+    cq-mounted --simple
+    cq-mounted /path/to/project --json
 """
 
 import sys
@@ -34,7 +34,7 @@ PROVIDERS = ["codex", "claude"]
 def find_session_file_path(cwd: Path, provider: str) -> Path | None:
     """Return the provider session file path if present."""
     candidates = (
-        cwd / ".ccb_config" / f".{provider}-session",
+        cwd / ".cq_config" / f".{provider}-session",
         cwd / f".{provider}-session",
     )
     for p in candidates:
@@ -132,8 +132,8 @@ def can_connect_localhost() -> bool:
 
 def main():
     parser = argparse.ArgumentParser(
-        prog="ccb-mounted",
-        description="Check which CCB providers are mounted for a project directory.",
+        prog=Path(sys.argv[0]).name or "cq-mounted",
+        description="Check which Code Quorum providers are mounted for a project directory.",
     )
     parser.add_argument("cwd", nargs="?", default=".", help="Project directory (default: current working directory).")
     fmt_group = parser.add_mutually_exclusive_group()

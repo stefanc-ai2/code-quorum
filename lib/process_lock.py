@@ -40,7 +40,7 @@ def _is_pid_alive(pid: int) -> bool:
 class ProviderLock:
     """Per-provider, per-directory file lock to serialize request-response cycles.
 
-    Lock files are stored in ~/.ccb/run/{provider}-{cwd_hash}.lock
+    Lock files are stored in ~/.cq/run/{provider}-{cwd_hash}.lock
     """
 
     def __init__(self, provider: str, timeout: float = 60.0, cwd: str = None):
@@ -53,7 +53,7 @@ class ProviderLock:
         """
         self.provider = provider
         self.timeout = timeout
-        self.lock_dir = Path.home() / ".ccb" / "run"
+        self.lock_dir = Path.home() / ".cq" / "run"
 
         # Use working directory hash for per-directory locking
         if cwd is None:

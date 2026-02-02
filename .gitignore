@@ -6,7 +6,7 @@ __pycache__/
 docs/
 !docs/**/*.md
 tests/
-.ccb_config/
+.cq_config/
 .codex-session
 .gemini-session
 .claude-session

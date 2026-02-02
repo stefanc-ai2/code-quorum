@@ -41,7 +41,7 @@ def test_codex_ensure_pane_respawns_dead_pane(tmp_path: Path, monkeypatch: pytes
             "session_id": "test-session",
             "terminal": "tmux",
             "pane_id": "%1",
-            "pane_title_marker": "CCB-codex-test",
+            "pane_title_marker": "CQ-codex-test",
             "runtime_dir": str(tmp_path),
             "work_dir": str(tmp_path),
             "active": True,
@@ -52,7 +52,7 @@ def test_codex_ensure_pane_respawns_dead_pane(tmp_path: Path, monkeypatch: pytes
 
     backend = FakeTmuxBackend()
     backend.alive = {"%1": False, "%2": False}
-    backend.marker_map = {"CCB-codex": "%2"}
+    backend.marker_map = {"CQ-codex": "%2"}
     monkeypatch.setattr(codex_session, "get_backend_for_session", lambda data: backend)
 
     sess = codex_session.load_project_session(tmp_path)
@@ -75,7 +75,7 @@ def test_codex_ensure_pane_already_alive(tmp_path: Path, monkeypatch: pytest.Mon
             "session_id": "test-session",
             "terminal": "tmux",
             "pane_id": "%1",
-            "pane_title_marker": "CCB-codex-test",
+            "pane_title_marker": "CQ-codex-test",
             "work_dir": str(tmp_path),
             "active": True,
         }),
@@ -103,7 +103,7 @@ def test_codex_ensure_pane_marker_rediscover(tmp_path: Path, monkeypatch: pytest
             "session_id": "test-session",
             "terminal": "tmux",
             "pane_id": "%1",
-            "pane_title_marker": "CCB-codex-test",
+            "pane_title_marker": "CQ-codex-test",
             "work_dir": str(tmp_path),
             "active": True,
         }),
@@ -112,7 +112,7 @@ def test_codex_ensure_pane_marker_rediscover(tmp_path: Path, monkeypatch: pytest
 
     backend = FakeTmuxBackend()
     backend.alive = {"%1": False, "%2": True}
-    backend.marker_map = {"CCB-codex": "%2"}
+    backend.marker_map = {"CQ-codex": "%2"}
     monkeypatch.setattr(codex_session, "get_backend_for_session", lambda data: backend)
 
     sess = codex_session.load_project_session(tmp_path)

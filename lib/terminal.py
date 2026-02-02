@@ -62,15 +62,15 @@ def _load_cached_wezterm_bin() -> str | None:
     candidates: list[Path] = []
     xdg = (os.environ.get("XDG_CONFIG_HOME") or "").strip()
     if xdg:
-        candidates.append(Path(xdg) / "ccb" / "env")
+        candidates.append(Path(xdg) / "cq" / "env")
     if os.name == "nt":
         localappdata = (os.environ.get("LOCALAPPDATA") or "").strip()
         if localappdata:
-            candidates.append(Path(localappdata) / "ccb" / "env")
+            candidates.append(Path(localappdata) / "cq" / "env")
         appdata = (os.environ.get("APPDATA") or "").strip()
         if appdata:
-            candidates.append(Path(appdata) / "ccb" / "env")
-    candidates.append(Path.home() / ".config" / "ccb" / "env")
+            candidates.append(Path(appdata) / "cq" / "env")
+    candidates.append(Path.home() / ".config" / "cq" / "env")
 
     for config in candidates:
         try:
@@ -122,7 +122,7 @@ def _default_shell() -> tuple[str, str]:
 
 
 def get_shell_type() -> str:
-    if is_windows() and os.environ.get("CCB_BACKEND_ENV", "").lower() == "wsl":
+    if is_windows() and os.environ.get("CQ_BACKEND_ENV", "").lower() == "wsl":
         return "bash"
     shell, _ = _default_shell()
     if shell in ("pwsh", "powershell"):
@@ -149,7 +149,7 @@ class TmuxBackend(TerminalBackend):
 
     Compatibility note:
     - New API prefers tmux pane IDs like `%12`.
-    - Legacy CCB code may still pass a tmux *session name* as `pane_id` (pure tmux mode).
+    - Legacy code may still pass a tmux *session name* as `pane_id` (pure tmux mode).
       For backward compatibility, methods accept both:
         - If target starts with `%` or contains `:`/`.` it is treated as a tmux target (pane/window/session:win.pane).
         - Otherwise it is treated as a tmux session name (single-pane session legacy behavior).
@@ -160,7 +160,7 @@ class TmuxBackend(TerminalBackend):
 
     def __init__(self, *, socket_name: str | None = None):
         # Optional tmux server socket isolation (like `tmux -L <name>`). Useful for daemon mode.
-        self._socket_name = (socket_name or os.environ.get("CCB_TMUX_SOCKET") or "").strip() or None
+        self._socket_name = (socket_name or os.environ.get("CQ_TMUX_SOCKET") or "").strip() or None
 
     def _tmux_base(self) -> list[str]:
         cmd = ["tmux"]
@@ -275,7 +275,7 @@ class TmuxBackend(TerminalBackend):
         #
         # tmux 3.4 can error with `size missing` when splitting panes by percentage in detached
         # sessions (e.g. auto-created sessions before any client is attached). Using tmux's default
-        # 50% split avoids that class of failures and is what CCB uses for its layouts anyway.
+        # 50% split avoids that class of failures and is what CQ uses for its layouts anyway.
         try:
             cp = self._tmux_run(
                 ["split-window", flag, "-t", parent_pane_id, "-P", "-F", "#{pane_id}"],
@@ -304,7 +304,7 @@ class TmuxBackend(TerminalBackend):
 
     def set_pane_user_option(self, pane_id: str, name: str, value: str) -> None:
         """
-        Set a tmux user option (e.g. `@ccb_agent`) at pane scope.
+        Set a tmux user option (e.g. `@cq_agent`) at pane scope.
 
         This is used to keep UI labeling stable even if programs modify `pane_title`.
         """
@@ -380,11 +380,11 @@ class TmuxBackend(TerminalBackend):
                 self._tmux_run(["send-keys", "-t", session, "-l", sanitized], check=True)
                 self._tmux_run(["send-keys", "-t", session, "Enter"], check=True)
                 return
-            buffer_name = f"ccb-tb-{os.getpid()}-{int(time.time() * 1000)}"
+            buffer_name = f"cq-tb-{os.getpid()}-{int(time.time() * 1000)}"
             self._tmux_run(["load-buffer", "-b", buffer_name, "-"], check=True, input_bytes=sanitized.encode("utf-8"))
             try:
                 self._tmux_run(["paste-buffer", "-t", session, "-b", buffer_name, "-p"], check=True)
-                enter_delay = _env_float("CCB_TMUX_ENTER_DELAY", 0.5)
+                enter_delay = _env_float("CQ_TMUX_ENTER_DELAY", 0.5)
                 if enter_delay:
                     time.sleep(enter_delay)
                 self._tmux_run(["send-keys", "-t", session, "Enter"], check=True)
@@ -394,11 +394,11 @@ class TmuxBackend(TerminalBackend):
 
         # Pane-oriented: bracketed paste + unique tmux buffer + cleanup
         self._ensure_not_in_copy_mode(pane_id)
-        buffer_name = f"ccb-tb-{os.getpid()}-{int(time.time() * 1000)}"
+        buffer_name = f"cq-tb-{os.getpid()}-{int(time.time() * 1000)}"
         self._tmux_run(["load-buffer", "-b", buffer_name, "-"], check=True, input_bytes=sanitized.encode("utf-8"))
         try:
             self._tmux_run(["paste-buffer", "-p", "-t", pane_id, "-b", buffer_name], check=True)
-            enter_delay = _env_float("CCB_TMUX_ENTER_DELAY", 0.5)
+            enter_delay = _env_float("CQ_TMUX_ENTER_DELAY", 0.5)
             if enter_delay:
                 time.sleep(enter_delay)
             self._tmux_run(["send-keys", "-t", pane_id, "Enter"], check=True)
@@ -473,7 +473,7 @@ class TmuxBackend(TerminalBackend):
             Path(log_path).parent.mkdir(parents=True, exist_ok=True)
             cmd_body = f"{cmd_body} 2>> {shlex.quote(log_path)}"
 
-        shell = (os.environ.get("CCB_TMUX_SHELL") or "").strip()
+        shell = (os.environ.get("CQ_TMUX_SHELL") or "").strip()
         if not shell:
             # Prefer tmux's configured default shell when available.
             try:
@@ -486,7 +486,7 @@ class TmuxBackend(TerminalBackend):
         if not shell:
             shell = _default_shell()[0]
 
-        flags_raw = (os.environ.get("CCB_TMUX_SHELL_FLAGS") or "").strip()
+        flags_raw = (os.environ.get("CQ_TMUX_SHELL_FLAGS") or "").strip()
         if flags_raw:
             flags = shlex.split(flags_raw)
         else:
@@ -548,7 +548,7 @@ class TmuxBackend(TerminalBackend):
             return new_pane
 
         # Outside tmux: create a new detached tmux session as a root container.
-        session_name = f"ccb-{Path(cwd).name}-{int(time.time()) % 100000}-{os.getpid()}"
+        session_name = f"cq-{Path(cwd).name}-{int(time.time()) % 100000}-{os.getpid()}"
         self._tmux_run(["new-session", "-d", "-s", session_name, "-c", cwd], check=True)
         cp = self._tmux_run(["list-panes", "-t", session_name, "-F", "#{pane_id}"], capture=True, check=True)
         pane_id = (cp.stdout or "").splitlines()[0].strip() if (cp.stdout or "").strip() else ""
@@ -561,7 +561,7 @@ class TmuxBackend(TerminalBackend):
 
 class WeztermBackend(TerminalBackend):
     _wezterm_bin: Optional[str] = None
-    CCB_TITLE_MARKER = "CCB"
+    CQ_TITLE_MARKER = "CQ"
 
     def __init__(self) -> None:
         self._last_list_error: Optional[str] = None
@@ -636,11 +636,11 @@ class WeztermBackend(TerminalBackend):
         """
         # Windows needs longer delay
         default_delay = 0.05 if os.name == "nt" else 0.01
-        enter_delay = _env_float("CCB_WEZTERM_ENTER_DELAY", default_delay)
+        enter_delay = _env_float("CQ_WEZTERM_ENTER_DELAY", default_delay)
         if enter_delay:
             time.sleep(enter_delay)
 
-        env_method_raw = os.environ.get("CCB_WEZTERM_ENTER_METHOD")
+        env_method_raw = os.environ.get("CQ_WEZTERM_ENTER_METHOD")
         # Default behavior is intentionally unchanged on non-Windows platforms:
         # previously we used `send-text` with a CR byte; keep that unless the user overrides.
         default_method = "auto" if os.name == "nt" else "text"
@@ -652,7 +652,7 @@ class WeztermBackend(TerminalBackend):
         max_retries = 3
         for attempt in range(max_retries):
             # Only enable "auto key" behavior by default on native Windows.
-            # Users can force key injection everywhere via CCB_WEZTERM_ENTER_METHOD=key.
+            # Users can force key injection everywhere via CQ_WEZTERM_ENTER_METHOD=key.
             if method == "key" or (method == "auto" and os.name == "nt"):
                 if self._send_key_cli(pane_id, "Enter"):
                     return
@@ -702,7 +702,7 @@ class WeztermBackend(TerminalBackend):
         )
 
         # Wait for TUI to process bracketed paste content
-        paste_delay = _env_float("CCB_WEZTERM_PASTE_DELAY", 0.1)
+        paste_delay = _env_float("CQ_WEZTERM_PASTE_DELAY", 0.1)
         if paste_delay:
             time.sleep(paste_delay)
 
@@ -1087,7 +1087,7 @@ def create_auto_layout(
     tmux_session_name: str | None = None,
     percent: int = 50,
     set_markers: bool = True,
-    marker_prefix: str = "CCB",
+    marker_prefix: str = "CQ",
 ) -> LayoutResult:
     """
     Create tmux split layout for 1–4 providers, returning a provider->pane_id mapping.
@@ -1123,7 +1123,7 @@ def create_auto_layout(
             root = backend.get_current_pane_id()
         except Exception:
             # Daemon/outside tmux: create a detached session as a container.
-            session_name = (tmux_session_name or f"ccb-{Path(cwd).name}-{int(time.time()) % 100000}-{os.getpid()}").strip()
+            session_name = (tmux_session_name or f"cq-{Path(cwd).name}-{int(time.time()) % 100000}-{os.getpid()}").strip()
             if session_name:
                 # Reuse if already exists; else create.
                 if not backend.is_alive(session_name):

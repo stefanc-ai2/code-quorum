@@ -17,20 +17,20 @@ From `$ARGUMENTS`:
 
 Run:
 ```bash
-ccb-mounted
+cq-mounted
 ```
 
-If `ccb-mounted` succeeds and returns a `mounted[]` list, define:
+If `cq-mounted` succeeds and returns a `mounted[]` list, define:
 - For this skill, `{self} = claude`
 - `reviewers = mounted - {self}` (skip yourself)
 - If `reviewers=...` is provided, use `reviewers = (mounted ∩ requested_reviewers) - {self}`
 
-If `ccb-mounted` fails (non-zero) or returns invalid/empty output:
+If `cq-mounted` fails (non-zero) or returns invalid/empty output:
 - If `reviewers=...` is provided, use `reviewers = requested_reviewers - {self}`
 - Otherwise proceed solo
 
 If `reviewers` is empty, proceed solo but still do the same internal checklist.
-If `reviewers` is non-empty, generate a stable 32-hex `req_id` per reviewer (e.g. `PAIR_REVIEW_REQ_ID_<provider>`) and use it as the `ask` request id (`--req-id ...` or `CCB_REQ_ID=...`). `ask` will include a `CCB_REQ_ID: <id>` line at the top automatically so the reviewer can reply via reply-via-ask.
+If `reviewers` is non-empty, generate a stable 32-hex `req_id` per reviewer (e.g. `PAIR_REVIEW_REQ_ID_<provider>`) and use it as the `ask` request id (`--req-id ...` or `CQ_REQ_ID=...`). `ask` will include a `CQ_REQ_ID: <id>` line at the top automatically so the reviewer can reply via reply-via-ask.
 
 ## Step 1: Plan
 
@@ -43,6 +43,8 @@ Otherwise produce a compact plan:
 - Risks / assumptions
 - Test plan (what to run / what to add)
 
+Keep the plan biased toward the simplest approach that works (avoid unnecessary abstractions, flags, or refactors).
+
 Proceed with reasonable assumptions when required, but call them out explicitly.
 
 ## Step 2: Implementation (Driver pass)
@@ -51,6 +53,7 @@ Implement the plan with a bias toward:
 - Small, reviewable changes
 - Clear errors and edge-case handling
 - Minimal scope (fix root cause; avoid drive-by refactors)
+- Simplicity and elegance: prefer the smallest change that works; delete/simplify code when possible
 
 Run the most relevant local validations available (tests and/or build checks).
 
@@ -72,15 +75,12 @@ You are my pair-programming navigator (reviewer).
 Provide feedback only — do not invoke `/pair` and do not implement changes.
 
 When you're done, send your feedback back to me via reply-via-ask:
-1) Copy the `CCB_REQ_ID: ...` line at the top of this message
+1) Copy the `CQ_REQ_ID: ...` line at the top of this message
 2) Run:
    ask claude --reply-to <id> --caller <your provider> <<'EOF'
    <your feedback>
    EOF
 Do not reply in your own pane; send feedback via `ask --reply-to` so it arrives in my pane.
-
-PAIR_DRIVER:
-claude
 
 Requirement:
 <paste requirement>
@@ -97,7 +97,7 @@ Please review for:
 1) correctness/edge cases
 2) API/UX clarity (errors/messages)
 3) tests (what’s missing?)
-4) maintainability (simpler alternatives)
+4) simplicity: could any of this be deleted or made simpler?
 
 Reply with:
 - Must-fix issues
@@ -106,7 +106,7 @@ Reply with:
 ```
 
 Then run `ask <provider> --req-id "<id>"` (using the platform-appropriate invocation for your environment).
-Reviewers should use `--caller <your provider>` on `--reply-to` so reply payloads include the correct `CCB_FROM`.
+Reviewers should use `--caller <your provider>` on `--reply-to` so reply payloads include the correct `CQ_FROM`.
 
 If you need a raw example for Linux/macOS:
 ```bash
@@ -122,8 +122,8 @@ After sending review requests to all reviewers: **stop immediately**. Do not con
 Reviewers will send feedback back to your pane via `ask --reply-to ... --caller <provider>`.
 
 Each reply payload should include:
-- `CCB_REPLY: <req_id>` (the req_id from the original `ask`)
-- `CCB_FROM: <provider>`
+- `CQ_REPLY: <req_id>` (the req_id from the original `ask`)
+- `CQ_FROM: <provider>`
 
 This step is multi-turn. To get the feedback: end your turn and wait (do not run additional commands). Reviewers will send messages back to your terminal (driver pane) via `ask --reply-to`.
 Do not scrape panes to collect feedback (forbidden): no `wezterm cli get-text`, no `tmux capture-pane`, etc. The only supported mechanism is reply-via-ask.
@@ -160,14 +160,11 @@ You are my pair-programming navigator (iteration 2).
 Provide feedback only — do not invoke `/pair` and do not implement changes.
 
 When you're done, send your feedback back to me via reply-via-ask:
-1) Copy the `CCB_REQ_ID: ...` line at the top of this message
+1) Copy the `CQ_REQ_ID: ...` line at the top of this message
 2) Run:
    ask claude --reply-to <id> --caller <your provider> <<'EOF'
    <your feedback>
    EOF
-
-PAIR_DRIVER:
-claude
 
 What changed since iteration 1:
 - <bullet>
@@ -176,6 +173,7 @@ What changed since iteration 1:
 Please focus on:
 1) tests/coverage gaps
 2) maintainability/simpler alternatives
+3) simplification: could anything be deleted or made simpler?
 
 Reply with Must-fix / Should-fix / Nice-to-have.
 ```

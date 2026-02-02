@@ -7,8 +7,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Tuple
 
-from ccb_config import apply_backend_env
-from project_id import compute_ccb_project_id
+from cq_config import apply_backend_env
+from project_id import compute_cq_project_id
 from session_utils import find_project_session_file as _find_project_session_file, safe_write_session
 from terminal import get_backend_for_session
 
@@ -159,6 +159,12 @@ def load_project_session(work_dir: Path) -> Optional[CodexProjectSession]:
     data = _read_json(session_file)
     if not data:
         return None
+    data.setdefault("work_dir", str(work_dir))
+    if not data.get("cq_project_id"):
+        try:
+            data["cq_project_id"] = compute_cq_project_id(Path(data.get("work_dir") or work_dir))
+        except Exception:
+            pass
     return CodexProjectSession(session_file=session_file, data=data)
 
 
@@ -166,12 +172,12 @@ def compute_session_key(session: CodexProjectSession) -> str:
     """
     Compute the daemon routing/serialization key for this provider.
 
-    Hard rule: include provider + ccb_project_id to isolate projects and providers.
+    Hard rule: include provider + cq_project_id to isolate projects and providers.
     """
-    pid = str(session.data.get("ccb_project_id") or "").strip()
+    pid = str(session.data.get("cq_project_id") or "").strip()
     if not pid:
         try:
-            pid = compute_ccb_project_id(Path(session.work_dir))
+            pid = compute_cq_project_id(Path(session.work_dir))
         except Exception:
             pid = ""
     return f"codex:{pid}" if pid else "codex:unknown"

@@ -2,19 +2,19 @@
 
 ## Project Structure & Module Organization
 
-- `ccb`: primary CLI entrypoint (launcher/orchestrator).
+- `cq`: primary CLI entrypoint (launcher/orchestrator).
 - `lib/`: Python implementation (terminal backends, protocol markers, config/session utilities).
-- `bin/`: small CLI tools and wrappers (e.g. `ask`, `ping`, `ccb-mounted`).
+- `bin/`: small CLI tools and wrappers (e.g. `ask`, `ping`, `cq-mounted`).
 - `test/`: `pytest` suite (+ a few `test/system_*.sh` scripts).
 - `claude_skills/`, `codex_skills/`: provider skill bundles installed by `install.sh`.
 
 ## Build, Test, and Development Commands
 
-- `python -m compileall -q lib bin ccb`: fast syntax/type-syntax sanity check (matches CI).
+- `python -m compileall -q lib bin cq`: fast syntax/type-syntax sanity check (matches CI).
 - `python -m pip install -U pip pytest`: install test runner.
 - `python -m pytest test/ -v --tb=short`: run the full test suite locally.
 - `./install.sh install` / `./install.sh uninstall`: install or remove local commands (see env vars in `install.sh` header).
-- `./ccb -h`: run the launcher from the repo checkout (no install required).
+- `./cq -h`: run the launcher from the repo checkout (no install required).
 
 ## Coding Style & Naming Conventions
 
@@ -43,8 +43,8 @@
 
 ## Security & Configuration Tips
 
-- Don’t commit local session/config artifacts under `.ccb_config/` or provider runtime/session files.
-- Prefer configuration via `ccb.config` (`.ccb_config/ccb.config` or `~/.ccb/ccb.config`) and environment variables; avoid hardcoding paths or secrets.
+- Don’t commit local session/config artifacts under `.cq_config/` or provider runtime/session files.
+- Prefer configuration via `cq.config` (`.cq_config/cq.config` or `~/.cq/cq.config`) and environment variables; avoid hardcoding paths or secrets.
 
 ## Beads (Issue Tracking)
 

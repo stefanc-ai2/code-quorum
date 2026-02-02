@@ -8,9 +8,9 @@ _MESSAGES: dict[str, str] = {
     "or_install_tmux": "Or install tmux",
     "tmux_installed_not_inside": (
         "tmux is installed, but you're not inside a tmux session "
-        "(run `tmux` first, then run `ccb` inside tmux)"
+        "(run `tmux` first, then run `cq` inside tmux)"
     ),
-    "or_set_ccb_terminal": "Or set CCB_TERMINAL=wezterm and configure CODEX_WEZTERM_BIN",
+    "or_set_cq_terminal": "Or set CQ_TERMINAL=wezterm and configure CODEX_WEZTERM_BIN",
     "tmux_not_installed": "tmux not installed and WezTerm unavailable",
     "install_wezterm_or_tmux": "Solution: Install WezTerm (recommended) or tmux",
     # Startup messages
@@ -44,4 +44,3 @@ def t(key: str, **kwargs: object) -> str:
         return msg.format(**kwargs)
     except (KeyError, ValueError):
         return msg
-

@@ -31,7 +31,7 @@ EOF)
 
 ## Reply-via-ask (Bidirectional)
 
-If you receive a request that begins with `CCB_REQ_ID: <req_id>`, treat it as a task from **Codex**.
+If you receive a request that begins with `CQ_REQ_ID: <req_id>`, treat it as a task from **Codex**.
 
 When done, reply back to Codex via `ask`:
 ```bash
