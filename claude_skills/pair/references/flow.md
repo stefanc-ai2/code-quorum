@@ -97,7 +97,7 @@ Please review for:
 1) correctness/edge cases
 2) API/UX clarity (errors/messages)
 3) tests (what’s missing?)
-4) simplicity: could any of this be deleted or made simpler?
+4) simplicity: could any of this be made simpler?
 
 Reply with:
 - Must-fix issues
