@@ -107,6 +107,18 @@ CQ_FROM: claude
 
 ---
 
+## Skills (workflows)
+
+These skills are installed for the providers and use the **reply-via-ask** pattern described above.
+
+| Skill | Primary purpose | Code changes? | Interaction | Output | Use when |
+|:------|------------------|--------------|------------|--------|----------|
+| `all-plan` | Collaborative planning | No | Multi-turn: ask providers → synthesize | A concrete plan + decisions | You want agreement before coding |
+| `pair` | Implement + review loop | Yes | Multi-turn: implement → review → merge (repeat) | Code changes + reviewer feedback | You want higher-quality changes fast |
+| `poll` | “Ask the room” Q&A | No | Multi-turn: broadcast → collect replies → synthesize | A consensus answer (or split) | You want quick independent opinions |
+
+---
+
 ## Session isolation (repo A vs repo B)
 
 By default, `ask` resolves sessions **only** for the current project via `.cq_config/` and will not talk to sessions from a different repository.
