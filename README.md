@@ -125,3 +125,16 @@ cq-mounted --json
 python -m compileall -q lib bin cq test
 python -m pytest test/ -v --tb=short
 ```
+
+---
+
+## WezTerm notes
+
+`ask` sends text to a pane and then injects **Enter** so the target TUI processes it. If you see text get pasted but not submitted, tune these env vars:
+
+- `CQ_WEZTERM_ENTER_METHOD=auto|key|text` (default: `auto`)
+  - `auto`: try `wezterm cli send-key Enter`, fall back to a raw CR byte
+  - `key`: force `send-key` only (no fallback)
+  - `text`: legacy mode (CR byte only)
+- `CQ_WEZTERM_ENTER_DELAY` (seconds): delay before injecting Enter
+- `CQ_WEZTERM_PASTE_DELAY` (seconds): delay between paste-mode send and Enter injection (multiline)

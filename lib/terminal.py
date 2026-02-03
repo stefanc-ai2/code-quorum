@@ -6,6 +6,7 @@ import re
 import shlex
 import shutil
 import subprocess
+import sys
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -641,9 +642,9 @@ class WeztermBackend(TerminalBackend):
             time.sleep(enter_delay)
 
         env_method_raw = os.environ.get("CQ_WEZTERM_ENTER_METHOD")
-        # Default behavior is intentionally unchanged on non-Windows platforms:
-        # previously we used `send-text` with a CR byte; keep that unless the user overrides.
-        default_method = "auto" if os.name == "nt" else "text"
+        # Default to "auto": try `wezterm cli send-key` first (real key event), then fall back to a CR byte.
+        # Users can force the legacy behavior via `CQ_WEZTERM_ENTER_METHOD=text`.
+        default_method = "auto"
         method = (env_method_raw or default_method).strip().lower()
         if method not in {"auto", "key", "text"}:
             method = default_method
@@ -651,14 +652,14 @@ class WeztermBackend(TerminalBackend):
         # Retry mechanism for reliability (Windows native occasionally drops Enter)
         max_retries = 3
         for attempt in range(max_retries):
-            # Only enable "auto key" behavior by default on native Windows.
-            # Users can force key injection everywhere via CQ_WEZTERM_ENTER_METHOD=key.
-            if method == "key" or (method == "auto" and os.name == "nt"):
+            # Prefer a real key event. Fall back to a CR byte for older WezTerm CLIs or raw-mode TUIs.
+            if method in {"auto", "key"}:
                 if self._send_key_cli(pane_id, "Enter"):
                     return
 
             # Fallback: send CR byte; works for shells/readline, but not for all raw-mode TUIs.
-            if method in {"auto", "text", "key"}:
+            # NOTE: `key` mode is strict: if `send-key` fails, do not fall back.
+            if method in {"auto", "text"}:
                 result = _run(
                     [*self._cli_base_args(), "send-text", "--pane-id", pane_id, "--no-paste"],
                     input=b"\r",
@@ -668,7 +669,21 @@ class WeztermBackend(TerminalBackend):
                     return
 
             if attempt < max_retries - 1:
-                time.sleep(0.05)
+                time.sleep(0.05 * (attempt + 1))
+
+        # If we got here, all attempts failed. The message text may be waiting in the input buffer.
+        debug = (os.environ.get("CQ_DEBUG") or "").strip().lower() in ("1", "true", "yes")
+        if debug or method == "key":
+            hint = (
+                "Press Enter manually in the target pane. "
+                "If this happens often, try `CQ_WEZTERM_ENTER_METHOD=auto` and/or increase "
+                "`CQ_WEZTERM_ENTER_DELAY` / `CQ_WEZTERM_PASTE_DELAY`."
+            )
+            level = "DEBUG" if debug else "WARN"
+            print(
+                f"[{level}] WezTerm Enter injection failed (method={method}, pane_id={pane_id}). {hint}",
+                file=sys.stderr,
+            )
 
     def send_text(self, pane_id: str, text: str) -> None:
         sanitized = text.replace("\r", "").strip()
