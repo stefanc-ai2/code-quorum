@@ -152,6 +152,13 @@ To check what is currently mounted:
 cq-mounted --json
 ```
 
+To target a specific session or list all sessions:
+
+```bash
+cq-mounted --session feature-a --json
+cq-mounted --all-sessions --json
+```
+
 ---
 
 ## Development
