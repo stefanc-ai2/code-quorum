@@ -116,3 +116,60 @@ def test_start_codex_tmux_writes_session_file(monkeypatch, tmp_path: Path) -> No
     assert "input_fifo" not in data
     assert "output_fifo" not in data
     assert "tmux_log" not in data
+
+
+def test_cmd_start_namespaces_lock_by_session(monkeypatch, tmp_path: Path) -> None:
+    cq = _load_cq_module()
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".cq_config").mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(cq, "detect_terminal", lambda: "tmux")
+    monkeypatch.setattr(cq.tempfile, "gettempdir", lambda: str(tmp_path))
+    monkeypatch.delenv("CQ_SESSION", raising=False)
+
+    captured: dict[str, str] = {}
+
+    class _FakeLock:
+        def __init__(self, provider: str, timeout: float = 60.0, cwd: str | None = None):
+            captured["provider"] = provider
+            captured["cwd"] = str(cwd or "")
+            self.lock_file = tmp_path / "cq.lock"
+
+        def try_acquire(self) -> bool:
+            return True
+
+        def release(self) -> None:
+            return None
+
+    class _FakeLauncher:
+        def __init__(self, *args, **kwargs):
+            captured["session_name"] = str(kwargs.get("session_name") or "")
+
+        def run_up(self) -> int:
+            return 0
+
+    monkeypatch.setattr(cq, "ProviderLock", _FakeLock)
+    monkeypatch.setattr(cq, "AILauncher", _FakeLauncher)
+    monkeypatch.setattr(cq, "load_start_config", lambda *_a, **_k: SimpleNamespace(data={}, path=None))
+
+    rc = cq.cmd_start(
+        SimpleNamespace(
+            providers=["codex"],
+            resume=False,
+            auto=False,
+            session="Feature-X",
+        )
+    )
+    assert rc == 0
+    assert captured["provider"] == "cq"
+    assert captured["session_name"] == "feature-x"
+    assert captured["cwd"].endswith(f"::{captured['session_name']}")
+
+
+def test_managed_env_includes_cq_session(monkeypatch, tmp_path: Path) -> None:
+    cq = _load_cq_module()
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".cq_config").mkdir(parents=True, exist_ok=True)
+
+    launcher = cq.AILauncher(providers=["codex"], session_name="feature-x")
+    env = launcher._managed_env_overrides()
+    assert env.get("CQ_SESSION") == "feature-x"

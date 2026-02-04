@@ -29,6 +29,7 @@ from compat import setup_windows_encoding
 from cq_config import get_backend_env
 from cq_start_config import DEFAULT_PROVIDERS, ensure_default_start_config, load_start_config
 from session_utils import safe_write_session, check_session_writable, find_project_session_file
+from session_scope import DEFAULT_SESSION, SESSION_ENV_VAR, normalize_session_name, resolve_session_name
 from session_registry import upsert_registry
 from project_id import compute_cq_project_id
 from process_lock import ProviderLock
@@ -378,6 +379,7 @@ class AILauncher:
         resume: bool = False,
         auto: bool = False,
         cmd_config: dict | None = None,
+        session_name: str = DEFAULT_SESSION,
     ):
         self.providers = providers or ["codex"]
         self.resume = resume
@@ -385,6 +387,7 @@ class AILauncher:
         self.cmd_config = self._normalize_cmd_config(cmd_config)
         self.script_dir = Path(__file__).resolve().parent
         self.invocation_dir = Path.cwd()
+        self.cq_session_name = normalize_session_name(session_name)
         # Project root is strictly the current working directory.
         # Do NOT traverse upwards to infer a different root.
         try:
@@ -411,12 +414,14 @@ class AILauncher:
         self._migrate_legacy_project_files()
         os.environ["CQ_MANAGED"] = "1"
         os.environ["CQ_PARENT_PID"] = str(self.cq_pid)
+        os.environ[SESSION_ENV_VAR] = self.cq_session_name
         os.environ.setdefault("CQ_RUN_DIR", str(self.project_run_dir))
 
     def _managed_env_overrides(self) -> dict:
         env = {
             "CQ_MANAGED": "1",
             "CQ_PARENT_PID": str(self.cq_pid),
+            SESSION_ENV_VAR: self.cq_session_name,
         }
         if os.environ.get("CQ_RUN_DIR"):
             env["CQ_RUN_DIR"] = os.environ["CQ_RUN_DIR"]
@@ -1958,6 +1963,15 @@ def cmd_start(args):
         print("Or use WezTerm terminal emulator.", file=sys.stderr)
         return 1
 
+    try:
+        session_name = resolve_session_name(getattr(args, "session", None), env=os.environ)
+    except ValueError as exc:
+        print(f"❌ Invalid --session: {exc}", file=sys.stderr)
+        return 2
+
+    # Ensure the active session name is available for managed child panes.
+    os.environ[SESSION_ENV_VAR] = session_name
+
     def _env_truthy(name: str) -> bool:
         raw = os.environ.get(name)
         if raw is None:
@@ -2056,7 +2070,14 @@ def cmd_start(args):
 
     # Enforce a single launcher instance per directory.
     lock_cwd = str(Path.cwd().resolve())
-    cq_lock = ProviderLock("cq", timeout=0.1, cwd=lock_cwd)
+    lock_scope = f"{lock_cwd}::{session_name}"
+    cq_lock = ProviderLock("cq", timeout=0.1, cwd=lock_scope)
+    legacy_lock = None
+    if session_name == DEFAULT_SESSION:
+        # Backward compatibility: older cq versions used a per-directory lock scope.
+        # Take the legacy lock too so mixed-version processes cannot run concurrently.
+        legacy_lock = ProviderLock("cq", timeout=0.1, cwd=lock_cwd)
+
     if not cq_lock.try_acquire():
         pid = ""
         try:
@@ -2065,12 +2086,34 @@ def cmd_start(args):
             pid = ""
         pid_msg = f" (pid {pid})" if pid else ""
         print(
+            f"❌ Another cq instance is already running for this directory/session{pid_msg}.",
+            file=sys.stderr,
+        )
+        print(f"💡 Session: {session_name}", file=sys.stderr)
+        print("💡 Only one cq instance is allowed per directory/session.", file=sys.stderr)
+        return 2
+
+    if legacy_lock and not legacy_lock.try_acquire():
+        pid = ""
+        try:
+            pid = legacy_lock.lock_file.read_text(encoding="utf-8").strip()
+        except Exception:
+            pid = ""
+        pid_msg = f" (pid {pid})" if pid else ""
+        try:
+            cq_lock.release()
+        except Exception:
+            pass
+        print(
             f"❌ Another cq instance is already running for this directory{pid_msg}.",
             file=sys.stderr,
         )
-        print("💡 Only one cq instance is allowed per directory.", file=sys.stderr)
+        print("💡 Detected legacy lock (older cq version). Stop it and retry.", file=sys.stderr)
         return 2
+
     atexit.register(cq_lock.release)
+    if legacy_lock:
+        atexit.register(legacy_lock.release)
 
     providers, cmd_enabled = _parse_providers_with_cmd(args.providers or [])
     config = load_start_config(work_dir)
@@ -2110,6 +2153,7 @@ def cmd_start(args):
         resume=resume,
         auto=auto,
         cmd_config=cmd_config,
+        session_name=session_name,
     )
     return launcher.run_up()
 
@@ -2944,6 +2988,12 @@ def main():
         "providers",
         nargs="*",
         help="Backends to start (space or comma separated): codex, claude (add cmd for a shell pane)",
+    )
+    start_parser.add_argument(
+        "--session",
+        dest="session",
+        default=None,
+        help="Session name (default: $CQ_SESSION, else 'default').",
     )
     start_parser.add_argument("-r", "--resume", "--restore", action="store_true", help="Resume context")
     start_parser.add_argument("-a", "--auto", action="store_true", help="Full auto permission mode")

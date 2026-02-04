@@ -123,6 +123,18 @@ These skills are installed for the providers and use the **reply-via-ask** patte
 
 By default, `ask` resolves sessions **only** for the current project via `.cq_config/` and will not talk to sessions from a different repository.
 
+## Multiple sessions (same repo)
+
+Use `--session` to run multiple independent `cq` launchers in the same directory:
+
+```bash
+cq --session feature-a codex,claude
+cq --session feature-b codex,claude
+```
+
+This namespaces the launcher lock per (cwd,session) and exports `CQ_SESSION` in managed panes.
+Session-scoped provider session files are implemented in follow-up changes.
+
 To check what is currently mounted:
 
 ```bash
