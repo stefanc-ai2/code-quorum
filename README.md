@@ -134,6 +134,12 @@ cq --session feature-b codex,claude
 
 This namespaces the launcher lock per (cwd,session) and exports `CQ_SESSION` in managed panes.
 
+To send to a specific session from outside a managed pane:
+
+```bash
+ask --session feature-a codex "Review this diff"
+```
+
 Provider session files for named sessions live under:
 - `.cq_config/sessions/<name>/.codex-session`
 - `.cq_config/sessions/<name>/.claude-session`
