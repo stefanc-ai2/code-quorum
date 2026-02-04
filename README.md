@@ -138,6 +138,8 @@ Provider session files for named sessions live under:
 - `.cq_config/sessions/<name>/.codex-session`
 - `.cq_config/sessions/<name>/.claude-session`
 
+Pane titles are also namespaced (used for pane rediscovery) to avoid collisions across sessions.
+
 To check what is currently mounted:
 
 ```bash

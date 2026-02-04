@@ -185,6 +185,86 @@ def test_start_codex_tmux_writes_session_file_session_scoped(monkeypatch, tmp_pa
     assert data["pane_id"] == pane_id
 
 
+def test_pane_title_markers_are_namespaced_by_session_and_run_id(monkeypatch, tmp_path: Path) -> None:
+    cq = _load_cq_module()
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".cq_config").mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("TMUX_PANE", "%0")
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+
+    # Ensure runtime dir lands under tmp_path.
+    monkeypatch.setattr(cq.tempfile, "gettempdir", lambda: str(tmp_path))
+
+    # Fake tmux backend methods (no real tmux dependency).
+    class _FakeTmuxBackend:
+        def __init__(self, *args, **kwargs):
+            self._created = 0
+
+        def create_pane(
+            self,
+            cmd: str,
+            cwd: str,
+            direction: str = "right",
+            percent: int = 50,
+            parent_pane: str | None = None,
+        ) -> str:
+            self._created += 1
+            return f"%{10 + self._created}"
+
+        def set_pane_title(self, pane_id: str, title: str) -> None:
+            return None
+
+        def set_pane_user_option(self, pane_id: str, name: str, value: str) -> None:
+            return None
+
+        def respawn_pane(
+            self,
+            pane_id: str,
+            *,
+            cmd: str,
+            cwd: str | None = None,
+            stderr_log_path: str | None = None,
+            remain_on_exit: bool = True,
+        ) -> None:
+            return None
+
+    monkeypatch.setattr(cq, "TmuxBackend", _FakeTmuxBackend)
+
+    # Fake `tmux display-message ... #{pane_pid}`.
+    def _fake_run(argv, *args, **kwargs):
+        if argv[:3] == ["tmux", "display-message", "-p"] and "#{pane_pid}" in argv:
+            return subprocess.CompletedProcess(argv, 0, stdout="12345\n", stderr="")
+        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(cq.subprocess, "run", _fake_run)
+
+    launcher = cq.AILauncher(providers=["codex"], session_name="feature-x")
+    launcher.terminal_type = "tmux"
+    launcher.session_id = "ai-1234567890-99999"
+
+    pane_id = launcher._start_codex_tmux()
+    assert pane_id is not None
+
+    session_file = tmp_path / ".cq_config" / "sessions" / "feature-x" / ".codex-session"
+    data = cq.json.loads(session_file.read_text(encoding="utf-8"))
+    assert data["pane_title_marker"] == "CQ-feature-x-Codex-567890-99999"
+
+
+def test_pane_title_markers_are_unique_per_session(tmp_path: Path, monkeypatch) -> None:
+    cq = _load_cq_module()
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".cq_config").mkdir(parents=True, exist_ok=True)
+
+    a = cq.AILauncher(providers=["codex"], session_name="a")
+    a.session_id = "ai-1234567890-99999"
+    b = cq.AILauncher(providers=["codex"], session_name="b")
+    b.session_id = "ai-1234567890-99999"
+
+    assert a._pane_title_marker("codex") == "CQ-a-Codex-567890-99999"
+    assert b._pane_title_marker("codex") == "CQ-b-Codex-567890-99999"
+
+
 def test_sessions_do_not_overwrite_session_files(monkeypatch, tmp_path: Path) -> None:
     cq = _load_cq_module()
     monkeypatch.chdir(tmp_path)

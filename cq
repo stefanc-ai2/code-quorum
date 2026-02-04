@@ -547,6 +547,33 @@ class AILauncher:
             return str(self.wezterm_panes.get(prov, "") or "")
         return str(self.tmux_panes.get(prov, "") or "")
 
+    def _short_run_id(self) -> str:
+        sid = str(self.session_id or "").strip()
+        parts = sid.split("-")
+        if len(parts) >= 3 and parts[0] == "ai":
+            ts = parts[1]
+            pid = parts[2]
+            if ts.isdigit() and pid.isdigit():
+                return f"{ts[-6:]}-{pid}"
+        return sid[-12:] if len(sid) > 12 else sid
+
+    def _pane_title_marker(self, provider: str) -> str:
+        prov = (provider or "").strip().lower()
+        prov_label = prov.capitalize() if prov else "Unknown"
+        return f"CQ-{self.cq_session_name}-{prov_label}-{self._short_run_id()}"
+
+    def _set_current_pane_title_escape(self, title: str) -> None:
+        """
+        Best-effort set the terminal title for the *current* pane (useful for WezTerm).
+
+        In tmux, prefer `set_pane_title` to avoid relying on terminal title escape behavior.
+        """
+        try:
+            sys.stdout.write(f"\033]0;{title}\007")
+            sys.stdout.flush()
+        except Exception:
+            pass
+
     def _set_current_pane_label(self, provider: str) -> None:
         if self.terminal_type != "tmux":
             return
@@ -555,7 +582,7 @@ class AILauncher:
         try:
             backend = TmuxBackend()
             pane_id = backend.get_current_pane_id()
-            title = f"CQ-{provider.capitalize()}"
+            title = self._pane_title_marker(provider)
             backend.set_pane_title(pane_id, title)
             backend.set_pane_user_option(pane_id, "@cq_agent", provider.capitalize())
         except Exception:
@@ -727,7 +754,7 @@ class AILauncher:
             except StopIteration:
                 use_parent = None
 
-        pane_title_marker = f"CQ-{provider.capitalize()}"
+        pane_title_marker = self._pane_title_marker(provider)
         title_cmd = _build_pane_title_cmd(pane_title_marker)
         env_overrides = self._managed_env_overrides()
         full_cmd = title_cmd + self._build_env_prefix(env_overrides) + _build_export_path_cmd(self.script_dir / "bin") + start_cmd
@@ -1271,7 +1298,7 @@ class AILauncher:
 
         env_overrides = self._managed_env_overrides()
         start_cmd = self._build_env_prefix(env_overrides) + _build_export_path_cmd(self.script_dir / "bin") + self._build_codex_start_cmd()
-        pane_title_marker = "CQ-Codex"
+        pane_title_marker = self._pane_title_marker("codex")
 
         backend = TmuxBackend()
 
@@ -1372,7 +1399,7 @@ class AILauncher:
             print("❌ Unable to determine current pane id for Codex", file=sys.stderr)
             return 1
 
-        pane_title_marker = "CQ-Codex"
+        pane_title_marker = self._pane_title_marker("codex")
         if self.terminal_type == "tmux":
             try:
                 backend = TmuxBackend()
@@ -1380,6 +1407,8 @@ class AILauncher:
                 backend.set_pane_user_option(pane_id, "@cq_agent", "Codex")
             except Exception:
                 pass
+        elif self.terminal_type == "wezterm":
+            self._set_current_pane_title_escape(pane_title_marker)
 
         title_cmd = _build_pane_title_cmd(pane_title_marker) if self.terminal_type == "wezterm" else ""
         start_cmd = (
@@ -1662,6 +1691,8 @@ class AILauncher:
 
     def _start_claude(self) -> int:
         print(f"🚀 {t('starting_claude')}")
+        if self.terminal_type == "wezterm":
+            self._set_current_pane_title_escape(self._pane_title_marker("claude"))
         env = self._build_claude_env()
 
         try:
@@ -1712,8 +1743,9 @@ class AILauncher:
                 print(f"ℹ️ {t('no_claude_session')}")
 
         start_cmd = " ".join(cmd_parts)
+        pane_title_marker = self._pane_title_marker("claude")
         full_cmd = (
-            _build_pane_title_cmd("CQ-Claude")
+            _build_pane_title_cmd(pane_title_marker)
             + self._build_env_prefix(env_overrides)
             + _build_export_path_cmd(self.script_dir / "bin")
             + start_cmd
@@ -1730,7 +1762,7 @@ class AILauncher:
             backend = TmuxBackend()
             pane_id = backend.create_pane("", run_cwd, direction=use_direction, percent=50, parent_pane=use_parent)
             backend.respawn_pane(pane_id, cmd=full_cmd, cwd=run_cwd, remain_on_exit=True)
-            backend.set_pane_title(pane_id, "CQ-Claude")
+            backend.set_pane_title(pane_id, pane_title_marker)
             backend.set_pane_user_option(pane_id, "@cq_agent", "Claude")
             self.tmux_panes["claude"] = pane_id
 
@@ -1739,7 +1771,7 @@ class AILauncher:
                 session_id=self._read_local_claude_session_id(),
                 active=True,
                 pane_id=str(pane_id or ""),
-                pane_title_marker="CQ-Claude",
+                pane_title_marker=pane_title_marker,
                 terminal=self.terminal_type,
             )
         except Exception:
@@ -1919,11 +1951,14 @@ class AILauncher:
         # Mark current Claude pane/session as active when Claude is the anchor.
         if self.anchor_provider == "claude":
             try:
+                claude_marker = self._pane_title_marker("claude")
+                if self.terminal_type == "wezterm":
+                    self._set_current_pane_title_escape(claude_marker)
                 self._write_local_claude_session(
                     session_id=self._read_local_claude_session_id(),
                     active=True,
                     pane_id=str(self.anchor_pane_id or ""),
-                    pane_title_marker="CQ-Claude",
+                    pane_title_marker=claude_marker,
                     terminal=self.terminal_type,
                 )
             except Exception:
