@@ -134,6 +134,14 @@ cq --session feature-b codex,claude
 
 This namespaces the launcher lock per (cwd,session) and exports `CQ_SESSION` in managed panes.
 
+Inside a managed pane, `ask` and `cq-mounted` automatically scope to that session via `CQ_SESSION` (no `--session` needed):
+
+```bash
+# From within the codex pane of feature-a:
+ask claude "Any concerns with this approach?"
+cq-mounted --json
+```
+
 To send to a specific session from outside a managed pane:
 
 ```bash

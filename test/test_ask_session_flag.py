@@ -21,6 +21,7 @@ def test_ask_passes_session_flag_to_loader(tmp_path: Path, monkeypatch: pytest.M
     ask = _load_ask_module(repo_root)
 
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("CQ_SESSION", "other-session")
 
     sent: dict[str, str] = {}
 
@@ -40,6 +41,7 @@ def test_ask_passes_session_flag_to_loader(tmp_path: Path, monkeypatch: pytest.M
         assert work_dir.resolve() == tmp_path.resolve()
         assert session == "feature-x"
         assert env is not None
+        assert env.get("CQ_SESSION") == "other-session"
         return _Session()
 
     monkeypatch.setattr(ask, "load_codex_session", _fake_load_codex_session)

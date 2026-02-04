@@ -98,6 +98,19 @@ def test_session_utils_explicit_named_session_is_strict(tmp_path: Path) -> None:
     )
 
 
+def test_session_utils_env_named_session_allows_fallback(tmp_path: Path) -> None:
+    cfg = tmp_path / ".cq_config"
+    cfg.mkdir()
+    default = cfg / ".codex-session"
+    default.write_text("default", encoding="utf-8")
+
+    # Named session missing: fall back to default when resolved via env (non-explicit).
+    assert (
+        session_utils.find_project_session_file(tmp_path, ".codex-session", env={"CQ_SESSION": "feature-x"})
+        == default
+    )
+
+
 def test_find_project_session_file_strict_mode(tmp_path: Path) -> None:
     cfg = tmp_path / ".cq_config"
     cfg.mkdir()
