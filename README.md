@@ -16,7 +16,7 @@ Split-pane collaboration between **Claude** and **Codex** using **tmux** or **We
 
 ## What it does
 
-- `cq` starts **Claude** and/or **Codex** in separate panes and writes per-project session files under `.cq_config/`.
+- `cq` starts **Claude** and/or **Codex** in separate panes and writes per-project session files under `.cq_config/` (default) or `.cq_config/sessions/<name>/`.
 - `ask` sends a message directly to the target pane (send-only, always async).
 - Replies come back **in the pane** via `ask --reply-to ...` (bidirectional “reply-via-ask”).
 
@@ -133,7 +133,10 @@ cq --session feature-b codex,claude
 ```
 
 This namespaces the launcher lock per (cwd,session) and exports `CQ_SESSION` in managed panes.
-Session-scoped provider session files are implemented in follow-up changes.
+
+Provider session files for named sessions live under:
+- `.cq_config/sessions/<name>/.codex-session`
+- `.cq_config/sessions/<name>/.claude-session`
 
 To check what is currently mounted:
 

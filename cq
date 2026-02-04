@@ -29,7 +29,7 @@ from compat import setup_windows_encoding
 from cq_config import get_backend_env
 from cq_start_config import DEFAULT_PROVIDERS, ensure_default_start_config, load_start_config
 from session_utils import safe_write_session, check_session_writable, find_project_session_file
-from session_scope import DEFAULT_SESSION, SESSION_ENV_VAR, normalize_session_name, resolve_session_name
+from session_scope import DEFAULT_SESSION, SESSION_ENV_VAR, normalize_session_name, project_session_dir, resolve_session_name
 from session_registry import upsert_registry
 from project_id import compute_cq_project_id
 from process_lock import ProviderLock
@@ -430,9 +430,23 @@ class AILauncher:
     def _project_config_dir(self) -> Path:
         return self.project_root / ".cq_config"
 
+    def _project_session_dir(self) -> Path:
+        return project_session_dir(self.project_root, self.cq_session_name)
+
+    def _ensure_project_session_dir(self) -> bool:
+        session_dir = self._project_session_dir()
+        if session_dir.is_dir():
+            return True
+        try:
+            session_dir.mkdir(parents=True, exist_ok=True)
+            return True
+        except Exception as exc:
+            print(f"❌ Failed to create session directory: {session_dir}: {exc}", file=sys.stderr)
+            print(f"💡 Fix: mkdir -p {session_dir}", file=sys.stderr)
+            return False
+
     def _project_session_file(self, filename: str) -> Path:
-        cfg = self._project_config_dir()
-        return cfg / filename
+        return self._project_session_dir() / filename
 
     def _migrate_legacy_project_files(self) -> None:
         """
@@ -830,6 +844,8 @@ class AILauncher:
         pane_title_marker: str | None = None,
         terminal: str | None = None,
     ) -> None:
+        if not self._ensure_project_session_dir():
+            return
         path = self._claude_session_file()
         writable, reason, fix = check_session_writable(path)
         if not writable:
@@ -1415,6 +1431,8 @@ class AILauncher:
         return 1
 
     def _write_codex_session(self, runtime, tmux_session, *, pane_id=None, pane_title_marker=None, codex_start_cmd=None):
+        if not self._ensure_project_session_dir():
+            return False
         session_file = self._project_session_file(".codex-session")
 
         # Pre-check permissions
