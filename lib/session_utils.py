@@ -5,7 +5,9 @@ from __future__ import annotations
 import os
 import stat
 from pathlib import Path
-from typing import Tuple, Optional
+from typing import Mapping, Optional, Tuple
+
+from session_scope import find_project_session_file as _find_session_file, resolve_session_name
 
 
 CQ_PROJECT_CONFIG_DIRNAME = ".cq_config"
@@ -133,19 +135,29 @@ def print_session_error(msg: str, to_stderr: bool = True) -> None:
     print(msg, file=output)
 
 
-def find_project_session_file(work_dir: Path, session_filename: str) -> Optional[Path]:
+def find_project_session_file(
+    work_dir: Path,
+    session_filename: str,
+    *,
+    session: str | None = None,
+    env: Mapping[str, str] | None = None,
+) -> Optional[Path]:
     """
     Find a session file for the given work_dir.
 
-    Lookup is local-only (no upward traversal):
-      1) <work_dir>/.cq_config/<session_filename>
-      2) <work_dir>/<session_filename>  (legacy)
+    Lookup is local-only (no upward traversal) and supports multiple sessions:
+      1) <work_dir>/.cq_config/sessions/<session>/<session_filename> (if session != default)
+      2) <work_dir>/.cq_config/<session_filename>                   (default/legacy)
+      3) <work_dir>/<session_filename>                              (legacy)
+
+    The `session` argument is optional; when omitted, it is resolved via:
+      - env['CQ_SESSION'] (if present and valid)
+      - else 'default'
+
+    If `session` is explicitly provided and refers to a non-default session,
+    lookup is strict: we only check the session-scoped path and will not fall back
+    to default/legacy session files.
     """
-    current = Path(work_dir).resolve()
-    candidate = current / CQ_PROJECT_CONFIG_DIRNAME / session_filename
-    if candidate.exists():
-        return candidate
-    legacy = current / session_filename
-    if legacy.exists():
-        return legacy
-    return None
+    is_explicit = bool((session or "").strip())
+    effective = resolve_session_name(session, env=env)
+    return _find_session_file(work_dir, effective, session_filename, strict=is_explicit)

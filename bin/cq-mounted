@@ -27,20 +27,14 @@ lib_dir = script_dir.parent / "lib"
 sys.path.insert(0, str(lib_dir))
 
 from terminal import get_backend_for_session, get_pane_id_from_session
+from session_utils import find_project_session_file
 
 PROVIDERS = ["codex", "claude"]
 
 
 def find_session_file_path(cwd: Path, provider: str) -> Path | None:
     """Return the provider session file path if present."""
-    candidates = (
-        cwd / ".cq_config" / f".{provider}-session",
-        cwd / f".{provider}-session",
-    )
-    for p in candidates:
-        if p.exists():
-            return p
-    return None
+    return find_project_session_file(cwd, f".{provider}-session")
 
 
 def session_file_is_active(path: Path) -> bool:
