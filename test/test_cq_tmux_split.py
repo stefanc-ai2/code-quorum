@@ -345,6 +345,173 @@ def test_cmd_start_namespaces_lock_by_session(monkeypatch, tmp_path: Path) -> No
     assert captured["cwd"].endswith(f"::{captured['session_name']}")
 
 
+def test_cmd_start_lock_error_suggests_session_command(monkeypatch, tmp_path: Path, capsys) -> None:
+    cq = _load_cq_module()
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".cq_config").mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(cq, "detect_terminal", lambda: "tmux")
+    monkeypatch.delenv("CQ_SESSION", raising=False)
+    monkeypatch.setenv("CQ_AUTO_SESSION", "0")
+
+    class _FakeLock:
+        def __init__(self, provider: str, timeout: float = 60.0, cwd: str | None = None):
+            self.lock_file = tmp_path / "cq.lock"
+            self.lock_file.write_text("46767\n", encoding="utf-8")
+
+        def try_acquire(self) -> bool:
+            return False
+
+        def release(self) -> None:
+            return None
+
+    monkeypatch.setattr(cq, "ProviderLock", _FakeLock)
+
+    rc = cq.cmd_start(
+        SimpleNamespace(
+            providers=["claude", "codex"],
+            resume=False,
+            auto=False,
+            session=None,
+        )
+    )
+    assert rc == 2
+    err = capsys.readouterr().err
+    assert "❌ Another cq instance is already running for this directory/session (pid 46767)." in err
+    assert "💡 Session: default" in err
+    assert "cq --session default-2 claude codex" in err
+
+
+def test_cmd_start_auto_selects_new_session_when_default_locked(monkeypatch, tmp_path: Path, capsys) -> None:
+    cq = _load_cq_module()
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".cq_config").mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(cq, "detect_terminal", lambda: "tmux")
+    monkeypatch.delenv("CQ_SESSION", raising=False)
+    monkeypatch.delenv("CQ_AUTO_SESSION", raising=False)
+
+    captured: dict[str, str] = {}
+
+    class _FakeLock:
+        def __init__(self, provider: str, timeout: float = 60.0, cwd: str | None = None):
+            self.cwd = str(cwd or "")
+            self.lock_file = tmp_path / "cq.lock"
+
+        def try_acquire(self) -> bool:
+            if self.cwd.endswith("::default"):
+                self.lock_file.write_text("46767\n", encoding="utf-8")
+                return False
+            if self.cwd.endswith("::default-2"):
+                return True
+            return False
+
+        def release(self) -> None:
+            return None
+
+    class _FakeLauncher:
+        def __init__(self, *args, **kwargs):
+            captured["session_name"] = str(kwargs.get("session_name") or "")
+
+        def run_up(self) -> int:
+            return 0
+
+    monkeypatch.setattr(cq, "ProviderLock", _FakeLock)
+    monkeypatch.setattr(cq, "AILauncher", _FakeLauncher)
+    monkeypatch.setattr(cq, "load_start_config", lambda *_a, **_k: SimpleNamespace(data={}, path=None))
+
+    rc = cq.cmd_start(
+        SimpleNamespace(
+            providers=["claude", "codex"],
+            resume=False,
+            auto=False,
+            session=None,
+        )
+    )
+    assert rc == 0
+    assert captured["session_name"] == "default-2"
+    err = capsys.readouterr().err
+    assert "Auto-starting new session \"default-2\"" in err
+    assert os.environ.get("CQ_SESSION") == "default-2"
+    os.environ.pop("CQ_SESSION", None)
+
+
+def test_cmd_start_no_auto_session_flag_disables_auto_session(monkeypatch, tmp_path: Path, capsys) -> None:
+    cq = _load_cq_module()
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".cq_config").mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(cq, "detect_terminal", lambda: "tmux")
+    monkeypatch.delenv("CQ_SESSION", raising=False)
+    monkeypatch.delenv("CQ_AUTO_SESSION", raising=False)
+
+    class _FakeLock:
+        def __init__(self, provider: str, timeout: float = 60.0, cwd: str | None = None):
+            self.lock_file = tmp_path / "cq.lock"
+            self.lock_file.write_text("46767\n", encoding="utf-8")
+
+        def try_acquire(self) -> bool:
+            return False
+
+        def release(self) -> None:
+            return None
+
+    monkeypatch.setattr(cq, "ProviderLock", _FakeLock)
+
+    rc = cq.cmd_start(
+        SimpleNamespace(
+            providers=["claude", "codex"],
+            resume=False,
+            auto=False,
+            session=None,
+            no_auto_session=True,
+        )
+    )
+    assert rc == 2
+    err = capsys.readouterr().err
+    assert "💡 Session: default" in err
+    assert "cq --session default-2 --no-auto-session claude codex" in err
+
+
+def test_cmd_start_auto_session_exhaustion_errors(monkeypatch, tmp_path: Path, capsys) -> None:
+    cq = _load_cq_module()
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".cq_config").mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(cq, "detect_terminal", lambda: "tmux")
+    monkeypatch.delenv("CQ_SESSION", raising=False)
+    monkeypatch.delenv("CQ_AUTO_SESSION", raising=False)
+
+    class _FakeLock:
+        def __init__(self, provider: str, timeout: float = 60.0, cwd: str | None = None):
+            self.cwd = str(cwd or "")
+            self.lock_file = tmp_path / "cq.lock"
+
+        def try_acquire(self) -> bool:
+            if self.cwd.endswith("::default"):
+                self.lock_file.write_text("46767\n", encoding="utf-8")
+            return False
+
+        def release(self) -> None:
+            return None
+
+    class _FailLauncher:
+        def __init__(self, *args, **kwargs):
+            raise AssertionError("AILauncher should not be created when auto-session exhausts")
+
+    monkeypatch.setattr(cq, "ProviderLock", _FakeLock)
+    monkeypatch.setattr(cq, "AILauncher", _FailLauncher)
+    monkeypatch.setattr(cq, "load_start_config", lambda *_a, **_k: SimpleNamespace(data={}, path=None))
+
+    rc = cq.cmd_start(
+        SimpleNamespace(
+            providers=["claude", "codex"],
+            resume=False,
+            auto=False,
+            session=None,
+        )
+    )
+    assert rc == 2
+    err = capsys.readouterr().err
+    assert "❌ All auto-session slots are in use" in err
+
+
 def test_managed_env_includes_cq_session(monkeypatch, tmp_path: Path) -> None:
     cq = _load_cq_module()
     monkeypatch.chdir(tmp_path)

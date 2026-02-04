@@ -2019,14 +2019,14 @@ def cmd_start(args):
         print("Or use WezTerm terminal emulator.", file=sys.stderr)
         return 1
 
+    explicit_session_raw = (getattr(args, "session", None) or "").strip()
+    env_session_raw = (os.environ.get(SESSION_ENV_VAR) or "").strip()
+
     try:
-        session_name = resolve_session_name(getattr(args, "session", None), env=os.environ)
+        session_name = resolve_session_name(explicit_session_raw or None, env=os.environ)
     except ValueError as exc:
         print(f"❌ Invalid --session: {exc}", file=sys.stderr)
         return 2
-
-    # Ensure the active session name is available for managed child panes.
-    os.environ[SESSION_ENV_VAR] = session_name
 
     def _env_truthy(name: str) -> bool:
         raw = os.environ.get(name)
@@ -2038,6 +2038,15 @@ def cmd_start(args):
         if v in {"0", "false", "no", "n", "off"}:
             return False
         return False
+
+    def _env_falsey(name: str) -> bool:
+        raw = os.environ.get(name)
+        if raw is None:
+            return False
+        v = raw.strip().lower()
+        if not v:
+            return False
+        return v in {"0", "false", "no", "n", "off"}
 
     def _is_dangerous_root(cwd: Path) -> tuple[bool, str]:
         try:
@@ -2124,48 +2133,154 @@ def cmd_start(args):
             print(f"❌ Failed to create {cfg}: {exc}", file=sys.stderr)
             return 2
 
-    # Enforce a single launcher instance per directory.
+    # Enforce a single launcher instance per directory/session.
     lock_cwd = str(Path.cwd().resolve())
-    lock_scope = f"{lock_cwd}::{session_name}"
-    cq_lock = ProviderLock("cq", timeout=0.1, cwd=lock_scope)
-    legacy_lock = None
-    if session_name == DEFAULT_SESSION:
-        # Backward compatibility: older cq versions used a per-directory lock scope.
-        # Take the legacy lock too so mixed-version processes cannot run concurrently.
-        legacy_lock = ProviderLock("cq", timeout=0.1, cwd=lock_cwd)
 
-    if not cq_lock.try_acquire():
-        pid = ""
+    auto_session_allowed = (
+        session_name == DEFAULT_SESSION
+        and not explicit_session_raw
+        and not env_session_raw
+        and not getattr(args, "no_auto_session", False)
+        and not _env_falsey("CQ_AUTO_SESSION")
+    )
+
+    def _read_lock_pid(lock: ProviderLock) -> str:
         try:
-            pid = cq_lock.lock_file.read_text(encoding="utf-8").strip()
+            return lock.lock_file.read_text(encoding="utf-8").strip()
         except Exception:
-            pid = ""
+            return ""
+
+    def _suggest_next_session_name(current: str) -> str:
+        base = current
+        next_n = 2
+        match = re.fullmatch(r"(.+)-(\d+)", current)
+        if match:
+            base = match.group(1)
+            try:
+                next_n = int(match.group(2)) + 1
+            except ValueError:
+                next_n = 2
+        suffix = f"-{next_n}"
+        max_base_len = 64 - len(suffix)
+        if len(base) > max_base_len:
+            base = base[:max_base_len]
+        try:
+            return normalize_session_name(f"{base}{suffix}")
+        except ValueError:
+            return "default-2"
+
+    def _build_suggested_cmd(target_session: str) -> str:
+        parts = ["cq", "--session", target_session]
+        if getattr(args, "no_auto_session", False):
+            parts.append("--no-auto-session")
+        if args.resume:
+            parts.append("--resume")
+        if args.auto:
+            parts.append("--auto")
+        parts.extend(args.providers or [])
+        return " ".join(parts)
+
+    def _print_session_lock_error(locked_session: str, pid: str) -> int:
         pid_msg = f" (pid {pid})" if pid else ""
+        suggested_session = _suggest_next_session_name(locked_session)
+        suggested_cmd = _build_suggested_cmd(suggested_session)
         print(
             f"❌ Another cq instance is already running for this directory/session{pid_msg}.",
             file=sys.stderr,
         )
-        print(f"💡 Session: {session_name}", file=sys.stderr)
+        print(f"💡 Session: {locked_session}", file=sys.stderr)
         print("💡 Only one cq instance is allowed per directory/session.", file=sys.stderr)
+        print("💡 To start another session in this directory, run:", file=sys.stderr)
+        print(f"   {suggested_cmd}", file=sys.stderr)
         return 2
 
-    if legacy_lock and not legacy_lock.try_acquire():
-        pid = ""
-        try:
-            pid = legacy_lock.lock_file.read_text(encoding="utf-8").strip()
-        except Exception:
-            pid = ""
+    def _print_auto_session_notice(locked_session: str, pid: str, new_session: str) -> None:
         pid_msg = f" (pid {pid})" if pid else ""
-        try:
-            cq_lock.release()
-        except Exception:
-            pass
         print(
-            f"❌ Another cq instance is already running for this directory{pid_msg}.",
+            f"⚠️ Session \"{locked_session}\" is already running{pid_msg}. Auto-starting new session \"{new_session}\".",
             file=sys.stderr,
         )
-        print("💡 Detected legacy lock (older cq version). Stop it and retry.", file=sys.stderr)
-        return 2
+        print(f"💡 To target it later: ask --session {new_session} codex \"...\"", file=sys.stderr)
+
+    def _try_acquire_session_lock(name: str) -> ProviderLock:
+        lock_scope = f"{lock_cwd}::{name}"
+        return ProviderLock("cq", timeout=0.1, cwd=lock_scope)
+
+    def _try_acquire_auto_session_lock() -> tuple[str | None, ProviderLock | None]:
+        max_suffix = 50
+        for n in range(2, max_suffix + 1):
+            candidate = f"{DEFAULT_SESSION}-{n}"
+            try:
+                candidate = normalize_session_name(candidate)
+            except ValueError:
+                continue
+            lock = _try_acquire_session_lock(candidate)
+            if lock.try_acquire():
+                return candidate, lock
+        return None, None
+
+    cq_lock = _try_acquire_session_lock(session_name)
+    legacy_lock = None
+
+    if not cq_lock.try_acquire():
+        pid = _read_lock_pid(cq_lock)
+        if auto_session_allowed:
+            auto_name, auto_lock = _try_acquire_auto_session_lock()
+            if auto_name and auto_lock:
+                session_name = auto_name
+                cq_lock = auto_lock
+                _print_auto_session_notice(DEFAULT_SESSION, pid, session_name)
+            else:
+                print(
+                    "❌ All auto-session slots are in use (default-2..default-50).",
+                    file=sys.stderr,
+                )
+                print("💡 Use `cq --session <name> ...` to choose a custom session name.", file=sys.stderr)
+                return 2
+        else:
+            return _print_session_lock_error(session_name, pid)
+
+    if session_name == DEFAULT_SESSION:
+        legacy_lock = ProviderLock("cq", timeout=0.1, cwd=lock_cwd)
+        if not legacy_lock.try_acquire():
+            pid = _read_lock_pid(legacy_lock)
+            if auto_session_allowed:
+                try:
+                    cq_lock.release()
+                except Exception:
+                    pass
+                auto_name, auto_lock = _try_acquire_auto_session_lock()
+                if auto_name and auto_lock:
+                    session_name = auto_name
+                    cq_lock = auto_lock
+                    legacy_lock = None
+                    _print_auto_session_notice(DEFAULT_SESSION, pid, session_name)
+                else:
+                    print(
+                        "❌ All auto-session slots are in use (default-2..default-50).",
+                        file=sys.stderr,
+                    )
+                    print("💡 Use `cq --session <name> ...` to choose a custom session name.", file=sys.stderr)
+                    return 2
+            else:
+                pid_msg = f" (pid {pid})" if pid else ""
+                suggested_session = _suggest_next_session_name(DEFAULT_SESSION)
+                suggested_cmd = _build_suggested_cmd(suggested_session)
+                try:
+                    cq_lock.release()
+                except Exception:
+                    pass
+                print(
+                    f"❌ Another cq instance is already running for this directory{pid_msg}.",
+                    file=sys.stderr,
+                )
+                print("💡 Detected legacy lock (older cq version).", file=sys.stderr)
+                print("💡 To start another session in this directory, run:", file=sys.stderr)
+                print(f"   {suggested_cmd}", file=sys.stderr)
+                return 2
+
+    # Ensure the active session name is available for managed child panes.
+    os.environ[SESSION_ENV_VAR] = session_name
 
     atexit.register(cq_lock.release)
     if legacy_lock:
@@ -3050,6 +3165,12 @@ def main():
         dest="session",
         default=None,
         help="Session name (default: $CQ_SESSION, else 'default').",
+    )
+    start_parser.add_argument(
+        "--no-auto-session",
+        dest="no_auto_session",
+        action="store_true",
+        help="Disable auto-creating a new session when the default session is already running.",
     )
     start_parser.add_argument("-r", "--resume", "--restore", action="store_true", help="Resume context")
     start_parser.add_argument("-a", "--auto", action="store_true", help="Full auto permission mode")
