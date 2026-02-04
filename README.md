@@ -57,11 +57,20 @@ Uninstall:
 
 ## Quickstart
 
-From your project directory (must contain `.cq_config/`):
+From your project directory (run inside tmux or WezTerm; do this once per repo — `.cq_config/` is gitignored):
 
 ```bash
 mkdir -p .cq_config
 cq codex,claude
+```
+
+`cq` opens/respawns panes and then exits.
+You should see new panes appear running Claude/Codex.
+
+(Optional) Check what is mounted/reachable:
+
+```bash
+cq-mounted --json
 ```
 
 Send a message to a provider:
@@ -116,6 +125,14 @@ These skills are installed for the providers and use the **reply-via-ask** patte
 | `all-plan` | Collaborative planning | No | Multi-turn: ask providers → synthesize | A concrete plan + decisions | You want agreement before coding |
 | `pair` | Implement + review loop | Yes | Multi-turn: implement → review → merge (repeat) | Code changes + reviewer feedback | You want higher-quality changes fast |
 | `poll` | “Ask the room” Q&A | No | Multi-turn: broadcast → collect replies → synthesize | A consensus answer (or split) | You want quick independent opinions |
+
+You may also see utility skills/commands installed: `ask`, `mounted`, `ping`, and `cq-mounted` (CLI). The table above focuses on the multi-turn workflows.
+
+## Utilities
+
+- `cq-mounted --json`: show which providers are reachable for the current session (or `--all-sessions`).
+- `ping codex|claude`: Code Quorum reachability check for a provider pane (respects `CQ_SESSION`). (Not ICMP; if your shell finds the system `ping`, run the installed path or `./bin/ping` from a checkout.)
+- `cq kill [codex|claude]`: terminate sessions for the current directory/session (run inside the session pane, or prefix with `CQ_SESSION=...` from outside).
 
 ---
 
@@ -178,6 +195,14 @@ cq-mounted --all-sessions --json
 ```
 
 ---
+
+## Troubleshooting
+
+- `CQ must run inside tmux or WezTerm`: start `tmux` (then run `cq` inside it), or use WezTerm.
+- “Another cq instance is already running…”:
+  - To start a second independent session: `cq --session default-2 codex,claude` (or just re-run `cq codex,claude` and let it auto-pick `default-2`, `default-3`, …).
+  - To stop an existing session: run `cq kill` from inside that session’s pane (or use `CQ_SESSION=<name> cq kill` from outside).
+- `ask` can’t find a session/pane: run `cq-mounted --json` and `ping codex` / `ping claude` to confirm reachability, then start with `cq codex` / `cq claude` if needed.
 
 ## Development
 
