@@ -9,6 +9,7 @@ from typing import Any, Dict, Iterable, Optional
 
 from cli_output import atomic_write_text
 from project_id import compute_cq_project_id
+from session_scope import DEFAULT_SESSION, normalize_session_name
 from terminal import get_backend_for_session
 
 REGISTRY_PREFIX = "cq-session-"
@@ -28,6 +29,16 @@ def _debug(message: str) -> None:
 
 def _registry_dir() -> Path:
     return Path.home() / ".cq" / "run"
+
+
+def _normalize_cq_session_name(value: Any) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return DEFAULT_SESSION
+    try:
+        return normalize_session_name(raw)
+    except ValueError:
+        return DEFAULT_SESSION
 
 
 def registry_path_for_session(session_id: str) -> Path:
@@ -155,7 +166,9 @@ def _provider_pane_alive(record: Dict[str, Any], provider: str) -> bool:
         return False
 
 
-def load_registry_by_session_id(session_id: str) -> Optional[Dict[str, Any]]:
+def load_registry_by_session_id(
+    session_id: str, session_name: str | None = None
+) -> Optional[Dict[str, Any]]:
     if not session_id:
         return None
     path = registry_path_for_session(session_id)
@@ -164,6 +177,11 @@ def load_registry_by_session_id(session_id: str) -> Optional[Dict[str, Any]]:
     data = _load_registry_file(path)
     if not data:
         return None
+    if (session_name or "").strip():
+        want = _normalize_cq_session_name(session_name)
+        have = _normalize_cq_session_name(data.get("cq_session_name"))
+        if have != want:
+            return None
     updated_at = _coerce_updated_at(data.get("updated_at"), path)
     if _is_stale(updated_at):
         _debug(f"Registry stale for session {session_id}: {path}")
@@ -171,15 +189,24 @@ def load_registry_by_session_id(session_id: str) -> Optional[Dict[str, Any]]:
     return data
 
 
-def load_registry_by_claude_pane(pane_id: str) -> Optional[Dict[str, Any]]:
+def load_registry_by_claude_pane(
+    pane_id: str, session_name: str | None = None
+) -> Optional[Dict[str, Any]]:
     if not pane_id:
         return None
+    want_session = None
+    if (session_name or "").strip():
+        want_session = _normalize_cq_session_name(session_name)
     best: Optional[Dict[str, Any]] = None
     best_ts = -1
     for path in _iter_registry_files():
         data = _load_registry_file(path)
         if not data:
             continue
+        if want_session is not None:
+            have = _normalize_cq_session_name(data.get("cq_session_name"))
+            if have != want_session:
+                continue
         providers = _get_providers_map(data)
         claude = providers.get("claude") if isinstance(providers, dict) else None
         claude_pane = (claude or {}).get("pane_id") if isinstance(claude, dict) else None
@@ -195,9 +222,11 @@ def load_registry_by_claude_pane(pane_id: str) -> Optional[Dict[str, Any]]:
     return best
 
 
-def load_registry_by_project_id(cq_project_id: str, provider: str) -> Optional[Dict[str, Any]]:
+def load_registry_by_project_id(
+    cq_project_id: str, provider: str, session_name: str | None = None
+) -> Optional[Dict[str, Any]]:
     """
-    Load the newest alive registry record matching `{cq_project_id, provider}`.
+    Load the newest alive registry record matching `{cq_project_id, provider, session_name}`.
 
     This enforces directory isolation and avoids parent-directory pollution.
     """
@@ -205,6 +234,10 @@ def load_registry_by_project_id(cq_project_id: str, provider: str) -> Optional[D
     prov = (provider or "").strip().lower()
     if not proj or not prov:
         return None
+
+    want_session = None
+    if (session_name or "").strip():
+        want_session = _normalize_cq_session_name(session_name)
 
     best: Optional[Dict[str, Any]] = None
     best_ts = -1
@@ -217,6 +250,11 @@ def load_registry_by_project_id(cq_project_id: str, provider: str) -> Optional[D
         updated_at = _coerce_updated_at(data.get("updated_at"), path)
         if _is_stale(updated_at):
             continue
+
+        if want_session is not None:
+            have = _normalize_cq_session_name(data.get("cq_session_name"))
+            if have != want_session:
+                continue
 
         existing = (data.get("cq_project_id") or "").strip()
         inferred = ""
@@ -256,9 +294,11 @@ def load_registry_by_project_id(cq_project_id: str, provider: str) -> Optional[D
     return best
 
 
-def load_registry_by_project_id_unfiltered(cq_project_id: str, provider: str) -> Optional[Dict[str, Any]]:
+def load_registry_by_project_id_unfiltered(
+    cq_project_id: str, provider: str, session_name: str | None = None
+) -> Optional[Dict[str, Any]]:
     """
-    Load the newest registry record matching `{cq_project_id, provider}` without requiring pane liveness.
+    Load the newest registry record matching `{cq_project_id, provider, session_name}` without requiring pane liveness.
 
     Useful as a fallback when the registry is present but the pane has been closed/restarted.
     """
@@ -266,6 +306,10 @@ def load_registry_by_project_id_unfiltered(cq_project_id: str, provider: str) ->
     prov = (provider or "").strip().lower()
     if not proj or not prov:
         return None
+
+    want_session = None
+    if (session_name or "").strip():
+        want_session = _normalize_cq_session_name(session_name)
 
     best: Optional[Dict[str, Any]] = None
     best_ts = -1
@@ -277,6 +321,11 @@ def load_registry_by_project_id_unfiltered(cq_project_id: str, provider: str) ->
         updated_at = _coerce_updated_at(data.get("updated_at"), path)
         if _is_stale(updated_at):
             continue
+
+        if want_session is not None:
+            have = _normalize_cq_session_name(data.get("cq_session_name"))
+            if have != want_session:
+                continue
 
         existing = (data.get("cq_project_id") or "").strip()
         inferred = ""

@@ -4,11 +4,12 @@ import json
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Mapping, Optional, Tuple
 
 from cq_config import apply_backend_env
 from claude_session_resolver import resolve_claude_session
 from project_id import compute_cq_project_id
+from session_scope import project_session_dir, resolve_session_name
 from session_utils import safe_write_session
 from terminal import get_backend_for_session
 
@@ -103,8 +104,10 @@ class ClaudeProjectSession:
             return
 
 
-def load_project_session(work_dir: Path) -> Optional[ClaudeProjectSession]:
-    resolution = resolve_claude_session(work_dir)
+def load_project_session(
+    work_dir: Path, *, session: str | None = None, env: Mapping[str, str] | None = None
+) -> Optional[ClaudeProjectSession]:
+    resolution = resolve_claude_session(work_dir, session=session, env=env)
     if not resolution:
         return None
     data = dict(resolution.data or {})
@@ -119,9 +122,8 @@ def load_project_session(work_dir: Path) -> Optional[ClaudeProjectSession]:
     session_file = resolution.session_file
     if not session_file:
         try:
-            from session_utils import project_config_dir
-
-            session_file = project_config_dir(work_dir) / ".claude-session"
+            effective = resolve_session_name(session, env=env)
+            session_file = project_session_dir(work_dir, effective) / ".claude-session"
         except Exception:
             session_file = None
     if not session_file:

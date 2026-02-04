@@ -20,12 +20,12 @@ From `$ARGUMENTS`:
 
 Run:
 ```bash
-cq-mounted
+cq-mounted --session "${CQ_SESSION:-default}"
 ```
 
 This returns JSON like:
 ```json
-{"cwd":"/path/to/project","mounted":["codex","claude"]}
+{"cwd":"/path/to/project","session":"feature-a","mounted":["codex","claude"]}
 ```
 
 Parse the `mounted` array and **ONLY dispatch to providers in this list**.
@@ -247,11 +247,11 @@ Generate a stable 32-hex `req_id` as `CLAUDE_PLAN_REQ_ID`, then send the request
 ```bash
 CLAUDE_PLAN_REQ_ID="$(python -c 'import secrets; print(secrets.token_hex(16))')"
 
-ask claude --req-id "$CLAUDE_PLAN_REQ_ID" <<'EOF'
+ask --session "${CQ_SESSION:-default}" claude --req-id "$CLAUDE_PLAN_REQ_ID" <<'EOF'
 You are participating in /all-plan. Reply with design feedback only (no code changes).
 
 When done, send your design back to Codex via:
-  ask codex --reply-to=<req_id> --caller claude "<your design>"
+  ask --session "${CQ_SESSION:-default}" codex --reply-to=<req_id> --caller claude "<your design>"
 
 Design a solution for this requirement:
 
@@ -289,7 +289,7 @@ Save as `codex_design`.
 
 **3.1 Collect Response(s)**
 
-This flow is **multi-turn**. To collect responses: end your turn (do not run additional commands). Claude will send a message back to your terminal (driver pane) via `ask codex --reply-to=<CLAUDE_PLAN_REQ_ID> ...`.
+This flow is **multi-turn**. To collect responses: end your turn (do not run additional commands). Claude will send a message back to your terminal (driver pane) via `ask --session "${CQ_SESSION:-default}" codex --reply-to=<CLAUDE_PLAN_REQ_ID> ...`.
 
 - When the reply arrives, save it as `claude_design`.
 - Your own design should already be saved as `codex_design`.
@@ -380,11 +380,11 @@ Save as `merged_design_v1`.
 ```bash
 CLAUDE_REVIEW_1_REQ_ID="$(python -c 'import secrets; print(secrets.token_hex(16))')"
 
-ask claude --req-id "$CLAUDE_REVIEW_1_REQ_ID" <<'EOF'
+ask --session "${CQ_SESSION:-default}" claude --req-id "$CLAUDE_REVIEW_1_REQ_ID" <<'EOF'
 You are participating in /all-plan. Reply with critique only (no code changes).
 
 When done, send your review back to Codex via:
-  ask codex --reply-to=<req_id> --caller claude "<your review>"
+  ask --session "${CQ_SESSION:-default}" codex --reply-to=<req_id> --caller claude "<your review>"
 
 Review this merged design based on all CLI inputs:
 
@@ -406,7 +406,7 @@ EOF
 ```
 
 This is **multi-turn**:
-- Stop and wait (end your turn). Claude will reply via `ask codex --reply-to=<CLAUDE_REVIEW_1_REQ_ID> ...`.
+- Stop and wait (end your turn). Claude will reply via `ask --session "${CQ_SESSION:-default}" codex --reply-to=<CLAUDE_REVIEW_1_REQ_ID> ...`.
 - When it arrives, save it as `claude_review_1`.
 
 **4.3 Discussion Round 2 - Resolve & Finalize**
@@ -416,11 +416,11 @@ Based on Claude's review, refine the design:
 ```bash
 CLAUDE_REVIEW_2_REQ_ID="$(python -c 'import secrets; print(secrets.token_hex(16))')"
 
-ask claude --req-id "$CLAUDE_REVIEW_2_REQ_ID" <<'EOF'
+ask --session "${CQ_SESSION:-default}" claude --req-id "$CLAUDE_REVIEW_2_REQ_ID" <<'EOF'
 You are participating in /all-plan. Reply with final suggestions only (no code changes).
 
 When done, send your response back to Codex via:
-  ask codex --reply-to=<req_id> --caller claude "<your response>"
+  ask --session "${CQ_SESSION:-default}" codex --reply-to=<req_id> --caller claude "<your response>"
 
 Refined design based on your feedback:
 
@@ -439,7 +439,7 @@ EOF
 ```
 
 This is **multi-turn**:
-- Stop and wait (end your turn). Claude will reply via `ask codex --reply-to=<CLAUDE_REVIEW_2_REQ_ID> ...`.
+- Stop and wait (end your turn). Claude will reply via `ask --session "${CQ_SESSION:-default}" codex --reply-to=<CLAUDE_REVIEW_2_REQ_ID> ...`.
 - When it arrives, save it as `claude_review_2`.
 
 ---
@@ -617,6 +617,6 @@ Next: Review the plan and proceed with implementation when ready.
 - This skill is designed for complex features or architectural decisions
 - For simple tasks, use dual-design or direct implementation instead
 - This flow is multi-turn: dispatch via `ask`, then continue once reply-via-ask results arrive in-pane
-- **CRITICAL**: Always run `cq-mounted` first to detect which providers are active. Only dispatch to providers in the `mounted` array
+- **CRITICAL**: Always run `cq-mounted --session "${CQ_SESSION:-default}"` first to detect which providers are active. Only dispatch to providers in the `mounted` array
 - If only Codex and Claude are mounted, the collaboration will be between those two only
 - Plans are saved to `.cq_config/plans/` with descriptive filenames

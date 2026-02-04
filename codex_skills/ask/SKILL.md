@@ -18,7 +18,7 @@ The first argument must be the provider name:
 ## Execution (MANDATORY)
 
 ```bash
-ask $PROVIDER <<'EOF'
+ask --session "${CQ_SESSION:-default}" $PROVIDER <<'EOF'
 $MESSAGE
 EOF
 ```
@@ -35,7 +35,7 @@ If you receive a request that begins with `CQ_REQ_ID: <req_id>`, treat it as a t
 
 When done, reply back to Claude via `ask`:
 ```bash
-ask claude --reply-to "$REQ_ID" --caller codex <<'EOF'
+ask --session "${CQ_SESSION:-default}" claude --reply-to "$REQ_ID" --caller codex <<'EOF'
 <your result here>
 EOF
 ```

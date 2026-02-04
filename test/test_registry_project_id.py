@@ -136,3 +136,53 @@ def test_load_registry_by_project_id_infers_missing_project_id(tmp_path: Path, m
     rec = load_registry_by_project_id(pid, "codex")
     assert rec is not None
     assert rec.get("cq_session_id") == "legacy"
+
+
+def test_load_registry_by_project_id_filters_by_session_name(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    monkeypatch.setattr(
+        session_registry,
+        "get_backend_for_session",
+        lambda _rec: _FakeBackend(alive={"%a", "%b"}),
+    )
+
+    work_dir = tmp_path / "proj"
+    work_dir.mkdir()
+    pid = compute_cq_project_id(work_dir)
+    now = int(time.time())
+
+    _write_registry_file(
+        tmp_path,
+        "a",
+        {
+            "cq_session_id": "a",
+            "cq_session_name": "a",
+            "cq_project_id": pid,
+            "work_dir": str(work_dir),
+            "terminal": "tmux",
+            "updated_at": now - 1,
+            "providers": {"codex": {"pane_id": "%a"}},
+        },
+    )
+    _write_registry_file(
+        tmp_path,
+        "b",
+        {
+            "cq_session_id": "b",
+            "cq_session_name": "b",
+            "cq_project_id": pid,
+            "work_dir": str(work_dir),
+            "terminal": "tmux",
+            "updated_at": now,
+            "providers": {"codex": {"pane_id": "%b"}},
+        },
+    )
+
+    rec_a = load_registry_by_project_id(pid, "codex", session_name="a")
+    assert rec_a is not None
+    assert rec_a.get("cq_session_id") == "a"
+
+    rec_b = load_registry_by_project_id(pid, "codex", session_name="b")
+    assert rec_b is not None
+    assert rec_b.get("cq_session_id") == "b"

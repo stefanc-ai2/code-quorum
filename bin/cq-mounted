@@ -7,12 +7,14 @@ A provider is "mounted" if:
 2. Pane is reachable/alive (best-effort) - OR socket access is blocked (sandbox mode)
 
 Usage:
-    cq-mounted [CWD] [--json|--simple] [--include-inactive]
+    cq-mounted [CWD] [--json|--simple] [--include-inactive] [--session <name> | --all-sessions]
 
 Examples:
     cq-mounted
     cq-mounted --simple
     cq-mounted /path/to/project --json
+    cq-mounted --session feature-x --json
+    cq-mounted --all-sessions --json
 """
 
 import sys
@@ -27,20 +29,36 @@ lib_dir = script_dir.parent / "lib"
 sys.path.insert(0, str(lib_dir))
 
 from terminal import get_backend_for_session, get_pane_id_from_session
+from session_scope import DEFAULT_SESSION, resolve_session_name
+from session_utils import find_project_session_file
 
 PROVIDERS = ["codex", "claude"]
 
 
-def find_session_file_path(cwd: Path, provider: str) -> Path | None:
+def _iter_sessions(cwd: Path) -> list[str]:
+    sessions: list[str] = [DEFAULT_SESSION]
+    sessions_dir = cwd / ".cq_config" / "sessions"
+    try:
+        if not sessions_dir.is_dir():
+            return sessions
+        for child in sorted(sessions_dir.iterdir(), key=lambda p: p.name):
+            if not child.is_dir():
+                continue
+            name = (child.name or "").strip()
+            try:
+                normalized = resolve_session_name(name, env={})
+            except ValueError:
+                continue
+            if normalized != DEFAULT_SESSION and normalized not in sessions:
+                sessions.append(normalized)
+    except Exception:
+        return sessions
+    return sessions
+
+
+def find_session_file_path(cwd: Path, provider: str, session_name: str) -> Path | None:
     """Return the provider session file path if present."""
-    candidates = (
-        cwd / ".cq_config" / f".{provider}-session",
-        cwd / f".{provider}-session",
-    )
-    for p in candidates:
-        if p.exists():
-            return p
-    return None
+    return find_project_session_file(cwd, f".{provider}-session", session=session_name, env=os.environ)
 
 
 def session_file_is_active(path: Path) -> bool:
@@ -130,7 +148,7 @@ def can_connect_localhost() -> bool:
         return True  # Assume we can connect if test fails unexpectedly
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(
         prog=Path(sys.argv[0]).name or "cq-mounted",
         description="Check which Code Quorum providers are mounted for a project directory.",
@@ -144,6 +162,18 @@ def main():
         action="store_true",
         help="Include inactive sessions (active=false).",
     )
+    session_group = parser.add_mutually_exclusive_group()
+    session_group.add_argument(
+        "--session",
+        dest="session",
+        default=None,
+        help="Target a specific CQ session (default: $CQ_SESSION, else default).",
+    )
+    session_group.add_argument(
+        "--all-sessions",
+        action="store_true",
+        help="Enumerate providers for all sessions (default + .cq_config/sessions/*).",
+    )
 
     args = parser.parse_args()
     try:
@@ -155,37 +185,61 @@ def main():
     except Exception:
         pass
     include_inactive = bool(args.include_inactive)
+    try:
+        session_name = resolve_session_name((args.session or "").strip() or None, env=os.environ)
+    except ValueError as exc:
+        print(f"[ERROR] Invalid --session: {exc}", file=sys.stderr)
+        return 2
 
     # Check if we're in a sandboxed environment
     sandboxed = not can_connect_localhost()
 
-    mounted = []
+    def _mounted_for_session(name: str) -> list[str]:
+        mounted: list[str] = []
+        for provider in PROVIDERS:
+            session_file = find_session_file_path(cwd, provider, name)
+            if not session_file:
+                continue
+            if (not include_inactive) and (not session_file_is_active(session_file)):
+                continue
 
-    for provider in PROVIDERS:
-        session_file = find_session_file_path(cwd, provider)
-        if not session_file:
-            continue
-        if (not include_inactive) and (not session_file_is_active(session_file)):
-            continue
+            # Session exists (and is active unless include_inactive is set).
+            if sandboxed:
+                # In sandbox, trust session + active flag only.
+                mounted.append(provider)
+                continue
 
-        # Session exists (and is active unless include_inactive is set).
-        if sandboxed:
-            # In sandbox, trust session + active flag only.
+            data = read_session_data(session_file)
+            alive = pane_alive_for_session(data)
+            if alive is False:
+                continue
             mounted.append(provider)
-            continue
+        return mounted
 
-        data = read_session_data(session_file)
-        alive = pane_alive_for_session(data)
-        if alive is False:
-            continue
-        mounted.append(provider)
+    if args.all_sessions:
+        sessions = _iter_sessions(cwd)
+        items = [{"session": name, "mounted": _mounted_for_session(name)} for name in sessions]
+
+        if args.simple:
+            for item in items:
+                name = item["session"]
+                mounted = item["mounted"]
+                line = f"{name}: {' '.join(mounted)}".rstrip()
+                print(line)
+        else:
+            result = {"cwd": str(cwd), "sessions": items}
+            print(json.dumps(result))
+        return 0
+
+    mounted = _mounted_for_session(session_name)
 
     if args.simple:
         print(" ".join(mounted))
     else:
-        result = {"cwd": str(cwd), "mounted": mounted}
+        result = {"cwd": str(cwd), "session": session_name, "mounted": mounted}
         print(json.dumps(result))
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

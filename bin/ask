@@ -16,6 +16,9 @@ Examples:
     # Send a one-liner
     ask codex "Review this diff"
 
+    # Target a specific CQ session (for multiple independent sessions in one repo)
+    ask --session feature-x codex "Review this diff"
+
     # Send a multi-line message
     ask claude <<'EOF'
     Please review these changes:
@@ -51,6 +54,7 @@ from cq_protocol import make_req_id, wrap_reply_payload, wrap_request_prompt
 from claude_session import load_project_session as load_claude_session
 from cli_output import EXIT_ERROR, EXIT_OK
 from codex_session import load_project_session as load_codex_session
+from session_scope import SESSION_ENV_VAR, DEFAULT_SESSION, resolve_session_name
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
@@ -86,6 +90,7 @@ def _parser() -> argparse.ArgumentParser:
         epilog=(
             "Examples:\n"
             '  ask codex "Review this diff"\n'
+            '  ask --session feature-x codex "Review this diff"\n'
             "  ask claude <<'EOF'\n"
             "  Multi-line message...\n"
             "  EOF\n"
@@ -113,6 +118,12 @@ def main(argv: list[str]) -> int:
     parser = _parser()
     parser.add_argument(
         "provider", choices=("codex", "claude"), help="Target provider pane to send to."
+    )
+    parser.add_argument(
+        "--session",
+        dest="session",
+        default=None,
+        help=f"Target CQ session name (default: ${SESSION_ENV_VAR}, else {DEFAULT_SESSION}).",
     )
     parser.add_argument(
         "--reply-to",
@@ -143,11 +154,28 @@ def main(argv: list[str]) -> int:
         return EXIT_ERROR
 
     try:
-        args = parser.parse_args(argv[1:])
+        # Use inter-mixed parsing when available so `ask codex --req-id abc hello`
+        # works on older Python versions where `nargs="*"` positionals can
+        # prevent option parsing after the first positional.
+        parse = getattr(parser, "parse_intermixed_args", None)
+        if parse is not None:
+            try:
+                args = parse(argv[1:])
+            except TypeError:
+                args = parser.parse_args(argv[1:])
+        else:
+            args = parser.parse_args(argv[1:])
     except SystemExit as exc:
         # Keep consistent exit codes (argparse uses 2 for parse errors).
         return EXIT_OK if getattr(exc, "code", 1) == 0 else EXIT_ERROR
     provider = str(args.provider).lower()
+
+    session_arg = (args.session or "").strip() or None
+    try:
+        effective_session = resolve_session_name(session_arg, env=os.environ)
+    except ValueError as exc:
+        print(f"[ERROR] Invalid --session: {exc}", file=sys.stderr)
+        return EXIT_ERROR
 
     message = " ".join(args.message).strip()
     if not message and not sys.stdin.isatty():
@@ -175,16 +203,20 @@ def main(argv: list[str]) -> int:
 
     work_dir = Path.cwd()
     if provider == "codex":
-        session = load_codex_session(work_dir)
+        session = load_codex_session(work_dir, session=session_arg, env=os.environ)
     else:
-        session = load_claude_session(work_dir)
+        session = load_claude_session(work_dir, session=session_arg, env=os.environ)
 
     if not session:
+        session_hint = f" (session: {effective_session})" if effective_session != DEFAULT_SESSION else ""
         print(
-            f"[ERROR] No active {provider} session found for this directory.",
+            f"[ERROR] No active {provider} session found for this directory{session_hint}.",
             file=sys.stderr,
         )
-        print(f"[ERROR] Run `cq {provider}` in this project first.", file=sys.stderr)
+        cmd = f"cq {provider}"
+        if effective_session != DEFAULT_SESSION:
+            cmd = f"cq --session {effective_session} {provider}"
+        print(f"[ERROR] Run `{cmd}` in this project first.", file=sys.stderr)
         return EXIT_ERROR
 
     ok, pane_or_err = session.ensure_pane()

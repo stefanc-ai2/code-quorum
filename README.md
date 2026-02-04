@@ -16,7 +16,7 @@ Split-pane collaboration between **Claude** and **Codex** using **tmux** or **We
 
 ## What it does
 
-- `cq` starts **Claude** and/or **Codex** in separate panes and writes per-project session files under `.cq_config/`.
+- `cq` starts **Claude** and/or **Codex** in separate panes and writes per-project session files under `.cq_config/` (default) or `.cq_config/sessions/<name>/`.
 - `ask` sends a message directly to the target pane (send-only, always async).
 - Replies come back **in the pane** via `ask --reply-to ...` (bidirectional “reply-via-ask”).
 
@@ -123,10 +123,58 @@ These skills are installed for the providers and use the **reply-via-ask** patte
 
 By default, `ask` resolves sessions **only** for the current project via `.cq_config/` and will not talk to sessions from a different repository.
 
+## Multiple sessions (same repo)
+
+Use `--session` to run multiple independent `cq` launchers in the same directory:
+
+```bash
+cq --session feature-a codex,claude
+cq --session feature-b codex,claude
+```
+
+This namespaces the launcher lock per (cwd,session) and exports `CQ_SESSION` in managed panes.
+
+If you run `cq codex,claude` (no `--session`) and the default session is already running in this directory, `cq` will automatically start a new session (e.g. `default-2`) and print the chosen session name.
+
+To disable this behavior:
+
+```bash
+cq --no-auto-session codex,claude
+# or:
+CQ_AUTO_SESSION=0 cq codex,claude
+```
+
+Inside a managed pane, `ask` and `cq-mounted` automatically scope to that session via `CQ_SESSION` (no `--session` needed):
+
+```bash
+# From within the codex pane of feature-a:
+ask claude "Any concerns with this approach?"
+cq-mounted --json
+```
+
+To send to a specific session from outside a managed pane:
+
+```bash
+ask --session feature-a codex "Review this diff"
+```
+
+Provider session files for named sessions live under:
+- `.cq_config/sessions/<name>/.codex-session`
+- `.cq_config/sessions/<name>/.claude-session`
+
+Pane titles are also namespaced (used for pane rediscovery) to avoid collisions across sessions.
+
 To check what is currently mounted:
 
 ```bash
 cq-mounted --json
+```
+
+To target a specific session or list all sessions:
+
+```bash
+cq-mounted --session feature-a --json
+cq-mounted --all-sessions --json
 ```
 
 ---

@@ -29,6 +29,7 @@ from compat import setup_windows_encoding
 from cq_config import get_backend_env
 from cq_start_config import DEFAULT_PROVIDERS, ensure_default_start_config, load_start_config
 from session_utils import safe_write_session, check_session_writable, find_project_session_file
+from session_scope import DEFAULT_SESSION, SESSION_ENV_VAR, normalize_session_name, project_session_dir, resolve_session_name
 from session_registry import upsert_registry
 from project_id import compute_cq_project_id
 from process_lock import ProviderLock
@@ -378,6 +379,7 @@ class AILauncher:
         resume: bool = False,
         auto: bool = False,
         cmd_config: dict | None = None,
+        session_name: str = DEFAULT_SESSION,
     ):
         self.providers = providers or ["codex"]
         self.resume = resume
@@ -385,6 +387,7 @@ class AILauncher:
         self.cmd_config = self._normalize_cmd_config(cmd_config)
         self.script_dir = Path(__file__).resolve().parent
         self.invocation_dir = Path.cwd()
+        self.cq_session_name = normalize_session_name(session_name)
         # Project root is strictly the current working directory.
         # Do NOT traverse upwards to infer a different root.
         try:
@@ -411,12 +414,14 @@ class AILauncher:
         self._migrate_legacy_project_files()
         os.environ["CQ_MANAGED"] = "1"
         os.environ["CQ_PARENT_PID"] = str(self.cq_pid)
+        os.environ[SESSION_ENV_VAR] = self.cq_session_name
         os.environ.setdefault("CQ_RUN_DIR", str(self.project_run_dir))
 
     def _managed_env_overrides(self) -> dict:
         env = {
             "CQ_MANAGED": "1",
             "CQ_PARENT_PID": str(self.cq_pid),
+            SESSION_ENV_VAR: self.cq_session_name,
         }
         if os.environ.get("CQ_RUN_DIR"):
             env["CQ_RUN_DIR"] = os.environ["CQ_RUN_DIR"]
@@ -425,9 +430,23 @@ class AILauncher:
     def _project_config_dir(self) -> Path:
         return self.project_root / ".cq_config"
 
+    def _project_session_dir(self) -> Path:
+        return project_session_dir(self.project_root, self.cq_session_name)
+
+    def _ensure_project_session_dir(self) -> bool:
+        session_dir = self._project_session_dir()
+        if session_dir.is_dir():
+            return True
+        try:
+            session_dir.mkdir(parents=True, exist_ok=True)
+            return True
+        except Exception as exc:
+            print(f"❌ Failed to create session directory: {session_dir}: {exc}", file=sys.stderr)
+            print(f"💡 Fix: mkdir -p {session_dir}", file=sys.stderr)
+            return False
+
     def _project_session_file(self, filename: str) -> Path:
-        cfg = self._project_config_dir()
-        return cfg / filename
+        return self._project_session_dir() / filename
 
     def _migrate_legacy_project_files(self) -> None:
         """
@@ -528,6 +547,33 @@ class AILauncher:
             return str(self.wezterm_panes.get(prov, "") or "")
         return str(self.tmux_panes.get(prov, "") or "")
 
+    def _short_run_id(self) -> str:
+        sid = str(self.session_id or "").strip()
+        parts = sid.split("-")
+        if len(parts) >= 3 and parts[0] == "ai":
+            ts = parts[1]
+            pid = parts[2]
+            if ts.isdigit() and pid.isdigit():
+                return f"{ts[-6:]}-{pid}"
+        return sid[-12:] if len(sid) > 12 else sid
+
+    def _pane_title_marker(self, provider: str) -> str:
+        prov = (provider or "").strip().lower()
+        prov_label = prov.capitalize() if prov else "Unknown"
+        return f"CQ-{self.cq_session_name}-{prov_label}-{self._short_run_id()}"
+
+    def _set_current_pane_title_escape(self, title: str) -> None:
+        """
+        Best-effort set the terminal title for the *current* pane (useful for WezTerm).
+
+        In tmux, prefer `set_pane_title` to avoid relying on terminal title escape behavior.
+        """
+        try:
+            sys.stdout.write(f"\033]0;{title}\007")
+            sys.stdout.flush()
+        except Exception:
+            pass
+
     def _set_current_pane_label(self, provider: str) -> None:
         if self.terminal_type != "tmux":
             return
@@ -536,7 +582,7 @@ class AILauncher:
         try:
             backend = TmuxBackend()
             pane_id = backend.get_current_pane_id()
-            title = f"CQ-{provider.capitalize()}"
+            title = self._pane_title_marker(provider)
             backend.set_pane_title(pane_id, title)
             backend.set_pane_user_option(pane_id, "@cq_agent", provider.capitalize())
         except Exception:
@@ -708,7 +754,7 @@ class AILauncher:
             except StopIteration:
                 use_parent = None
 
-        pane_title_marker = f"CQ-{provider.capitalize()}"
+        pane_title_marker = self._pane_title_marker(provider)
         title_cmd = _build_pane_title_cmd(pane_title_marker)
         env_overrides = self._managed_env_overrides()
         full_cmd = title_cmd + self._build_env_prefix(env_overrides) + _build_export_path_cmd(self.script_dir / "bin") + start_cmd
@@ -825,6 +871,8 @@ class AILauncher:
         pane_title_marker: str | None = None,
         terminal: str | None = None,
     ) -> None:
+        if not self._ensure_project_session_dir():
+            return
         path = self._claude_session_file()
         writable, reason, fix = check_session_writable(path)
         if not writable:
@@ -864,6 +912,7 @@ class AILauncher:
                 upsert_registry(
                     {
                         "cq_session_id": self.session_id,
+                        "cq_session_name": self.cq_session_name,
                         "cq_project_id": compute_cq_project_id(self.project_root),
                         "work_dir": str(self.project_root),
                         "terminal": terminal or self.terminal_type,
@@ -1250,7 +1299,7 @@ class AILauncher:
 
         env_overrides = self._managed_env_overrides()
         start_cmd = self._build_env_prefix(env_overrides) + _build_export_path_cmd(self.script_dir / "bin") + self._build_codex_start_cmd()
-        pane_title_marker = "CQ-Codex"
+        pane_title_marker = self._pane_title_marker("codex")
 
         backend = TmuxBackend()
 
@@ -1351,7 +1400,7 @@ class AILauncher:
             print("❌ Unable to determine current pane id for Codex", file=sys.stderr)
             return 1
 
-        pane_title_marker = "CQ-Codex"
+        pane_title_marker = self._pane_title_marker("codex")
         if self.terminal_type == "tmux":
             try:
                 backend = TmuxBackend()
@@ -1359,6 +1408,8 @@ class AILauncher:
                 backend.set_pane_user_option(pane_id, "@cq_agent", "Codex")
             except Exception:
                 pass
+        elif self.terminal_type == "wezterm":
+            self._set_current_pane_title_escape(pane_title_marker)
 
         title_cmd = _build_pane_title_cmd(pane_title_marker) if self.terminal_type == "wezterm" else ""
         start_cmd = (
@@ -1410,6 +1461,8 @@ class AILauncher:
         return 1
 
     def _write_codex_session(self, runtime, tmux_session, *, pane_id=None, pane_title_marker=None, codex_start_cmd=None):
+        if not self._ensure_project_session_dir():
+            return False
         session_file = self._project_session_file(".codex-session")
 
         # Pre-check permissions
@@ -1452,6 +1505,7 @@ class AILauncher:
         try:
             upsert_registry({
                 "cq_session_id": self.session_id,
+                "cq_session_name": self.cq_session_name,
                 "cq_project_id": compute_cq_project_id(self.project_root),
                 "work_dir": str(self.project_root),
                 "terminal": self.terminal_type,
@@ -1472,6 +1526,7 @@ class AILauncher:
             return False
         record = {
             "cq_session_id": self.session_id,
+            "cq_session_name": self.cq_session_name,
             "claude_pane_id": claude_pane_id,
             "codex_pane_id": codex_pane_id,
             "cq_project_id": compute_cq_project_id(self.project_root),
@@ -1639,6 +1694,8 @@ class AILauncher:
 
     def _start_claude(self) -> int:
         print(f"🚀 {t('starting_claude')}")
+        if self.terminal_type == "wezterm":
+            self._set_current_pane_title_escape(self._pane_title_marker("claude"))
         env = self._build_claude_env()
 
         try:
@@ -1689,8 +1746,9 @@ class AILauncher:
                 print(f"ℹ️ {t('no_claude_session')}")
 
         start_cmd = " ".join(cmd_parts)
+        pane_title_marker = self._pane_title_marker("claude")
         full_cmd = (
-            _build_pane_title_cmd("CQ-Claude")
+            _build_pane_title_cmd(pane_title_marker)
             + self._build_env_prefix(env_overrides)
             + _build_export_path_cmd(self.script_dir / "bin")
             + start_cmd
@@ -1707,7 +1765,7 @@ class AILauncher:
             backend = TmuxBackend()
             pane_id = backend.create_pane("", run_cwd, direction=use_direction, percent=50, parent_pane=use_parent)
             backend.respawn_pane(pane_id, cmd=full_cmd, cwd=run_cwd, remain_on_exit=True)
-            backend.set_pane_title(pane_id, "CQ-Claude")
+            backend.set_pane_title(pane_id, pane_title_marker)
             backend.set_pane_user_option(pane_id, "@cq_agent", "Claude")
             self.tmux_panes["claude"] = pane_id
 
@@ -1716,7 +1774,7 @@ class AILauncher:
                 session_id=self._read_local_claude_session_id(),
                 active=True,
                 pane_id=str(pane_id or ""),
-                pane_title_marker="CQ-Claude",
+                pane_title_marker=pane_title_marker,
                 terminal=self.terminal_type,
             )
         except Exception:
@@ -1896,11 +1954,14 @@ class AILauncher:
         # Mark current Claude pane/session as active when Claude is the anchor.
         if self.anchor_provider == "claude":
             try:
+                claude_marker = self._pane_title_marker("claude")
+                if self.terminal_type == "wezterm":
+                    self._set_current_pane_title_escape(claude_marker)
                 self._write_local_claude_session(
                     session_id=self._read_local_claude_session_id(),
                     active=True,
                     pane_id=str(self.anchor_pane_id or ""),
-                    pane_title_marker="CQ-Claude",
+                    pane_title_marker=claude_marker,
                     terminal=self.terminal_type,
                 )
             except Exception:
@@ -1958,6 +2019,15 @@ def cmd_start(args):
         print("Or use WezTerm terminal emulator.", file=sys.stderr)
         return 1
 
+    explicit_session_raw = (getattr(args, "session", None) or "").strip()
+    env_session_raw = (os.environ.get(SESSION_ENV_VAR) or "").strip()
+
+    try:
+        session_name = resolve_session_name(explicit_session_raw or None, env=os.environ)
+    except ValueError as exc:
+        print(f"❌ Invalid --session: {exc}", file=sys.stderr)
+        return 2
+
     def _env_truthy(name: str) -> bool:
         raw = os.environ.get(name)
         if raw is None:
@@ -1968,6 +2038,15 @@ def cmd_start(args):
         if v in {"0", "false", "no", "n", "off"}:
             return False
         return False
+
+    def _env_falsey(name: str) -> bool:
+        raw = os.environ.get(name)
+        if raw is None:
+            return False
+        v = raw.strip().lower()
+        if not v:
+            return False
+        return v in {"0", "false", "no", "n", "off"}
 
     def _is_dangerous_root(cwd: Path) -> tuple[bool, str]:
         try:
@@ -2054,23 +2133,158 @@ def cmd_start(args):
             print(f"❌ Failed to create {cfg}: {exc}", file=sys.stderr)
             return 2
 
-    # Enforce a single launcher instance per directory.
+    # Enforce a single launcher instance per directory/session.
     lock_cwd = str(Path.cwd().resolve())
-    cq_lock = ProviderLock("cq", timeout=0.1, cwd=lock_cwd)
-    if not cq_lock.try_acquire():
-        pid = ""
+
+    auto_session_allowed = (
+        session_name == DEFAULT_SESSION
+        and not explicit_session_raw
+        and not env_session_raw
+        and not getattr(args, "no_auto_session", False)
+        and not _env_falsey("CQ_AUTO_SESSION")
+    )
+
+    def _read_lock_pid(lock: ProviderLock) -> str:
         try:
-            pid = cq_lock.lock_file.read_text(encoding="utf-8").strip()
+            return lock.lock_file.read_text(encoding="utf-8").strip()
         except Exception:
-            pid = ""
+            return ""
+
+    def _suggest_next_session_name(current: str) -> str:
+        base = current
+        next_n = 2
+        match = re.fullmatch(r"(.+)-(\d+)", current)
+        if match:
+            base = match.group(1)
+            try:
+                next_n = int(match.group(2)) + 1
+            except ValueError:
+                next_n = 2
+        suffix = f"-{next_n}"
+        max_base_len = 64 - len(suffix)
+        if len(base) > max_base_len:
+            base = base[:max_base_len]
+        try:
+            return normalize_session_name(f"{base}{suffix}")
+        except ValueError:
+            return "default-2"
+
+    def _build_suggested_cmd(target_session: str) -> str:
+        parts = ["cq", "--session", target_session]
+        if getattr(args, "no_auto_session", False):
+            parts.append("--no-auto-session")
+        if args.resume:
+            parts.append("--resume")
+        if args.auto:
+            parts.append("--auto")
+        parts.extend(args.providers or [])
+        return " ".join(parts)
+
+    def _print_session_lock_error(locked_session: str, pid: str) -> int:
         pid_msg = f" (pid {pid})" if pid else ""
+        suggested_session = _suggest_next_session_name(locked_session)
+        suggested_cmd = _build_suggested_cmd(suggested_session)
         print(
-            f"❌ Another cq instance is already running for this directory{pid_msg}.",
+            f"❌ Another cq instance is already running for this directory/session{pid_msg}.",
             file=sys.stderr,
         )
-        print("💡 Only one cq instance is allowed per directory.", file=sys.stderr)
+        print(f"💡 Session: {locked_session}", file=sys.stderr)
+        print("💡 Only one cq instance is allowed per directory/session.", file=sys.stderr)
+        print("💡 To start another session in this directory, run:", file=sys.stderr)
+        print(f"   {suggested_cmd}", file=sys.stderr)
         return 2
+
+    def _print_auto_session_notice(locked_session: str, pid: str, new_session: str) -> None:
+        pid_msg = f" (pid {pid})" if pid else ""
+        print(
+            f"⚠️ Session \"{locked_session}\" is already running{pid_msg}. Auto-starting new session \"{new_session}\".",
+            file=sys.stderr,
+        )
+        print(f"💡 To target it later: ask --session {new_session} codex \"...\"", file=sys.stderr)
+
+    def _try_acquire_session_lock(name: str) -> ProviderLock:
+        lock_scope = f"{lock_cwd}::{name}"
+        return ProviderLock("cq", timeout=0.1, cwd=lock_scope)
+
+    def _try_acquire_auto_session_lock() -> tuple[str | None, ProviderLock | None]:
+        max_suffix = 50
+        for n in range(2, max_suffix + 1):
+            candidate = f"{DEFAULT_SESSION}-{n}"
+            try:
+                candidate = normalize_session_name(candidate)
+            except ValueError:
+                continue
+            lock = _try_acquire_session_lock(candidate)
+            if lock.try_acquire():
+                return candidate, lock
+        return None, None
+
+    cq_lock = _try_acquire_session_lock(session_name)
+    legacy_lock = None
+
+    if not cq_lock.try_acquire():
+        pid = _read_lock_pid(cq_lock)
+        if auto_session_allowed:
+            auto_name, auto_lock = _try_acquire_auto_session_lock()
+            if auto_name and auto_lock:
+                session_name = auto_name
+                cq_lock = auto_lock
+                _print_auto_session_notice(DEFAULT_SESSION, pid, session_name)
+            else:
+                print(
+                    "❌ All auto-session slots are in use (default-2..default-50).",
+                    file=sys.stderr,
+                )
+                print("💡 Use `cq --session <name> ...` to choose a custom session name.", file=sys.stderr)
+                return 2
+        else:
+            return _print_session_lock_error(session_name, pid)
+
+    if session_name == DEFAULT_SESSION:
+        legacy_lock = ProviderLock("cq", timeout=0.1, cwd=lock_cwd)
+        if not legacy_lock.try_acquire():
+            pid = _read_lock_pid(legacy_lock)
+            if auto_session_allowed:
+                try:
+                    cq_lock.release()
+                except Exception:
+                    pass
+                auto_name, auto_lock = _try_acquire_auto_session_lock()
+                if auto_name and auto_lock:
+                    session_name = auto_name
+                    cq_lock = auto_lock
+                    legacy_lock = None
+                    _print_auto_session_notice(DEFAULT_SESSION, pid, session_name)
+                else:
+                    print(
+                        "❌ All auto-session slots are in use (default-2..default-50).",
+                        file=sys.stderr,
+                    )
+                    print("💡 Use `cq --session <name> ...` to choose a custom session name.", file=sys.stderr)
+                    return 2
+            else:
+                pid_msg = f" (pid {pid})" if pid else ""
+                suggested_session = _suggest_next_session_name(DEFAULT_SESSION)
+                suggested_cmd = _build_suggested_cmd(suggested_session)
+                try:
+                    cq_lock.release()
+                except Exception:
+                    pass
+                print(
+                    f"❌ Another cq instance is already running for this directory{pid_msg}.",
+                    file=sys.stderr,
+                )
+                print("💡 Detected legacy lock (older cq version).", file=sys.stderr)
+                print("💡 To start another session in this directory, run:", file=sys.stderr)
+                print(f"   {suggested_cmd}", file=sys.stderr)
+                return 2
+
+    # Ensure the active session name is available for managed child panes.
+    os.environ[SESSION_ENV_VAR] = session_name
+
     atexit.register(cq_lock.release)
+    if legacy_lock:
+        atexit.register(legacy_lock.release)
 
     providers, cmd_enabled = _parse_providers_with_cmd(args.providers or [])
     config = load_start_config(work_dir)
@@ -2110,6 +2324,7 @@ def cmd_start(args):
         resume=resume,
         auto=auto,
         cmd_config=cmd_config,
+        session_name=session_name,
     )
     return launcher.run_up()
 
@@ -2944,6 +3159,18 @@ def main():
         "providers",
         nargs="*",
         help="Backends to start (space or comma separated): codex, claude (add cmd for a shell pane)",
+    )
+    start_parser.add_argument(
+        "--session",
+        dest="session",
+        default=None,
+        help="Session name (default: $CQ_SESSION, else 'default').",
+    )
+    start_parser.add_argument(
+        "--no-auto-session",
+        dest="no_auto_session",
+        action="store_true",
+        help="Disable auto-creating a new session when the default session is already running.",
     )
     start_parser.add_argument("-r", "--resume", "--restore", action="store_true", help="Resume context")
     start_parser.add_argument("-a", "--auto", action="store_true", help="Full auto permission mode")

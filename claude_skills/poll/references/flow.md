@@ -15,7 +15,7 @@ From `$ARGUMENTS`:
 
 Run:
 ```bash
-cq-mounted
+cq-mounted --session "${CQ_SESSION:-default}"
 ```
 
 If `cq-mounted` succeeds and returns a `mounted[]` list, define:
@@ -52,9 +52,9 @@ You are responding to a multi-provider poll. Provide an answer only — do not i
 When you're done, send your answer back to the poll driver via reply-via-ask:
 1) Copy the `CQ_REQ_ID: ...` line at the top of this message (added automatically by `ask`)
 2) Run:
-	   ask claude --reply-to <CQ_REQ_ID> --caller <your provider> <<'EOF'
-	   <your answer>
-	   EOF
+   ask --session "${CQ_SESSION:-default}" claude --reply-to <CQ_REQ_ID> --caller <your provider> <<'EOF'
+   <your answer>
+   EOF
 Do not reply in your own pane; send your answer via `ask --reply-to` so it arrives in the driver's pane.
 
 Question:
@@ -68,7 +68,7 @@ Reply with:
 
 Then run, once per respondent (sequentially; pause ~1s between providers):
 ```bash
-ask <provider> --req-id "$CQ_REQ_ID" <<'EOF'
+ask --session "${CQ_SESSION:-default}" <provider> --req-id "$CQ_REQ_ID" <<'EOF'
 <message>
 EOF
 ```

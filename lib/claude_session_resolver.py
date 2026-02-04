@@ -5,7 +5,7 @@ import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Mapping, Optional
 
 from session_registry import (
     load_registry_by_claude_pane,
@@ -14,7 +14,8 @@ from session_registry import (
     load_registry_by_session_id,
 )
 from project_id import compute_cq_project_id
-from session_utils import find_project_session_file, project_config_dir
+from session_scope import project_session_dir, resolve_session_name
+from session_utils import find_project_session_file
 
 
 SESSION_ENV_KEYS = (
@@ -119,9 +120,9 @@ def _select_resolution(data: dict, session_file: Optional[Path], record: Optiona
     )
 
 
-def _candidate_default_session_file(work_dir: Path) -> Optional[Path]:
+def _candidate_session_file(work_dir: Path, session_name: str) -> Optional[Path]:
     try:
-        cfg = project_config_dir(work_dir)
+        cfg = project_session_dir(work_dir, session_name)
     except Exception:
         return None
     return cfg / ".claude-session"
@@ -194,14 +195,19 @@ def _normalize_session_binding(data: dict, work_dir: Path) -> None:
             data["claude_session_path"] = str(candidate)
 
 
-def resolve_claude_session(work_dir: Path) -> Optional[ClaudeSessionResolution]:
+def resolve_claude_session(
+    work_dir: Path, *, session: str | None = None, env: Mapping[str, str] | None = None
+) -> Optional[ClaudeSessionResolution]:
+    env_map = os.environ if env is None else env
+    effective_session = resolve_session_name(session, env=env_map)
+
     best_fallback: Optional[ClaudeSessionResolution] = None
     try:
         current_pid = compute_cq_project_id(work_dir)
     except Exception:
         current_pid = ""
     strict_project = (Path(work_dir) / ".cq_config").is_dir()
-    allow_cross = os.environ.get("CQ_ALLOW_CROSS_PROJECT_SESSION") in ("1", "true", "yes")
+    allow_cross = env_map.get("CQ_ALLOW_CROSS_PROJECT_SESSION") in ("1", "true", "yes")
     if not strict_project and not allow_cross:
         return None
 
@@ -232,10 +238,10 @@ def resolve_claude_session(work_dir: Path) -> Optional[ClaudeSessionResolution]:
 
     # 1) Registry via session id envs
     for key in SESSION_ENV_KEYS:
-        session_id = (os.environ.get(key) or "").strip()
+        session_id = (env_map.get(key) or "").strip()
         if not session_id:
             continue
-        record = load_registry_by_session_id(session_id)
+        record = load_registry_by_session_id(session_id, session_name=effective_session)
         if not isinstance(record, dict):
             continue
         if not allow_cross and strict_project:
@@ -243,7 +249,9 @@ def resolve_claude_session(work_dir: Path) -> Optional[ClaudeSessionResolution]:
             if not record_pid or (current_pid and record_pid != current_pid):
                 continue
         data = _data_from_registry(record, work_dir)
-        session_file = _session_file_from_record(record) or find_project_session_file(work_dir, ".claude-session")
+        session_file = _session_file_from_record(record) or find_project_session_file(
+            work_dir, ".claude-session", session=session, env=env_map
+        )
         candidate = _select_resolution(data, session_file, record, f"registry:{key}")
         resolved = consider(candidate)
         if resolved:
@@ -256,27 +264,31 @@ def resolve_claude_session(work_dir: Path) -> Optional[ClaudeSessionResolution]:
     except Exception:
         pid = ""
     if pid:
-        record = load_registry_by_project_id(pid, "claude")
+        record = load_registry_by_project_id(pid, "claude", session_name=effective_session)
         if isinstance(record, dict):
             data = _data_from_registry(record, work_dir)
-            session_file = _session_file_from_record(record) or find_project_session_file(work_dir, ".claude-session")
+            session_file = _session_file_from_record(record) or find_project_session_file(
+                work_dir, ".claude-session", session=session, env=env_map
+            )
             candidate = _select_resolution(data, session_file, record, "registry:project")
             resolved = consider(candidate)
             if resolved:
                 return resolved
 
         # Fallback: accept latest registry record even if pane liveness can't be verified.
-        unfiltered = load_registry_by_project_id_unfiltered(pid, "claude")
+        unfiltered = load_registry_by_project_id_unfiltered(pid, "claude", session_name=effective_session)
         if isinstance(unfiltered, dict):
             data = _data_from_registry(unfiltered, work_dir)
-            session_file = _session_file_from_record(unfiltered) or find_project_session_file(work_dir, ".claude-session")
+            session_file = _session_file_from_record(unfiltered) or find_project_session_file(
+                work_dir, ".claude-session", session=session, env=env_map
+            )
             candidate = _select_resolution(data, session_file, unfiltered, "registry:project_unfiltered")
             resolved = consider(candidate)
             if resolved:
                 return resolved
 
     # 3) .claude-session file
-    session_file = find_project_session_file(work_dir, ".claude-session")
+    session_file = find_project_session_file(work_dir, ".claude-session", session=session, env=env_map)
     if session_file:
         data = _read_json(session_file)
         if data:
@@ -288,9 +300,9 @@ def resolve_claude_session(work_dir: Path) -> Optional[ClaudeSessionResolution]:
                 return resolved
 
     # 4) Registry via current pane id
-    pane_id = (os.environ.get("WEZTERM_PANE") or os.environ.get("TMUX_PANE") or "").strip()
+    pane_id = (env_map.get("WEZTERM_PANE") or env_map.get("TMUX_PANE") or "").strip()
     if pane_id:
-        record = load_registry_by_claude_pane(pane_id)
+        record = load_registry_by_claude_pane(pane_id, session_name=effective_session)
         if isinstance(record, dict):
             if not allow_cross and strict_project:
                 record_pid = _record_project_id(record)
@@ -298,7 +310,9 @@ def resolve_claude_session(work_dir: Path) -> Optional[ClaudeSessionResolution]:
                     record = None
             if record:
                 data = _data_from_registry(record, work_dir)
-                session_file = _session_file_from_record(record) or find_project_session_file(work_dir, ".claude-session")
+                session_file = _session_file_from_record(record) or find_project_session_file(
+                    work_dir, ".claude-session", session=session, env=env_map
+                )
                 candidate = _select_resolution(data, session_file, record, "registry:pane")
                 resolved = consider(candidate)
                 if resolved:
@@ -306,7 +320,7 @@ def resolve_claude_session(work_dir: Path) -> Optional[ClaudeSessionResolution]:
 
     if best_fallback:
         if not best_fallback.session_file:
-            best_fallback.session_file = _candidate_default_session_file(work_dir)
+            best_fallback.session_file = _candidate_session_file(work_dir, effective_session)
         return best_fallback
 
     return None
