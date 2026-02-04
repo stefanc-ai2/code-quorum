@@ -17,7 +17,7 @@ From `$ARGUMENTS`:
 
 Run:
 ```bash
-cq-mounted
+cq-mounted --session "${CQ_SESSION:-default}"
 ```
 
 If `cq-mounted` succeeds and returns a `mounted[]` list, define:
@@ -77,7 +77,7 @@ Provide feedback only — do not invoke `/pair` and do not implement changes.
 When you're done, send your feedback back to me via reply-via-ask:
 1) Copy the `CQ_REQ_ID: ...` line at the top of this message
 2) Run:
-   ask codex --reply-to <id> --caller <your provider> <<'EOF'
+   ask --session "${CQ_SESSION:-default}" codex --reply-to <id> --caller <your provider> <<'EOF'
    <your feedback>
    EOF
 Do not reply in your own pane; send feedback via `ask --reply-to` so it arrives in my pane.
@@ -107,7 +107,7 @@ Reply with:
 
 Then run:
 ```bash
-ask <provider> --req-id "<id>" <<'EOF'
+ask --session "${CQ_SESSION:-default}" <provider> --req-id "<id>" <<'EOF'
 <message>
 EOF
 ```
@@ -115,7 +115,7 @@ EOF
 Notes:
 - Prefer invoking the installed `/ask` skill for your environment if you’re not sure about shell syntax.
 - To avoid race conditions, send `ask` requests sequentially with a short pause (e.g. ~1s) between providers.
- - Reviewers should not run `/pair` recursively; they should only respond with critique.
+- Reviewers should not run `/pair` recursively; they should only respond with critique.
 
 After sending review requests to all reviewers: **stop immediately**. Do not continue implementation or merging until feedback arrives via reply-via-ask.
 
@@ -164,7 +164,7 @@ Provide feedback only — do not invoke `/pair` and do not implement changes.
 When you're done, send your feedback back to me via reply-via-ask:
 1) Copy the `CQ_REQ_ID: ...` line at the top of this message
 2) Run:
-   ask codex --reply-to <id> --caller <your provider> <<'EOF'
+   ask --session "${CQ_SESSION:-default}" codex --reply-to <id> --caller <your provider> <<'EOF'
    <your feedback>
    EOF
 
