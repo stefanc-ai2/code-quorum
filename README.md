@@ -134,6 +134,16 @@ cq --session feature-b codex,claude
 
 This namespaces the launcher lock per (cwd,session) and exports `CQ_SESSION` in managed panes.
 
+If you run `cq codex,claude` (no `--session`) and the default session is already running in this directory, `cq` will automatically start a new session (e.g. `default-2`) and print the chosen session name.
+
+To disable this behavior:
+
+```bash
+cq --no-auto-session codex,claude
+# or:
+CQ_AUTO_SESSION=0 cq codex,claude
+```
+
 Inside a managed pane, `ask` and `cq-mounted` automatically scope to that session via `CQ_SESSION` (no `--session` needed):
 
 ```bash
