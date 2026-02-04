@@ -154,7 +154,17 @@ def main(argv: list[str]) -> int:
         return EXIT_ERROR
 
     try:
-        args = parser.parse_args(argv[1:])
+        # Use inter-mixed parsing when available so `ask codex --req-id abc hello`
+        # works on older Python versions where `nargs="*"` positionals can
+        # prevent option parsing after the first positional.
+        parse = getattr(parser, "parse_intermixed_args", None)
+        if parse is not None:
+            try:
+                args = parse(argv[1:])
+            except TypeError:
+                args = parser.parse_args(argv[1:])
+        else:
+            args = parser.parse_args(argv[1:])
     except SystemExit as exc:
         # Keep consistent exit codes (argparse uses 2 for parse errors).
         return EXIT_OK if getattr(exc, "code", 1) == 0 else EXIT_ERROR
