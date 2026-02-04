@@ -5,7 +5,7 @@ import os
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Mapping, Optional, Tuple
 
 from cq_config import apply_backend_env
 from project_id import compute_cq_project_id
@@ -15,8 +15,10 @@ from terminal import get_backend_for_session
 apply_backend_env()
 
 
-def find_project_session_file(work_dir: Path) -> Optional[Path]:
-    return _find_project_session_file(work_dir, ".codex-session")
+def find_project_session_file(
+    work_dir: Path, *, session: str | None = None, env: Mapping[str, str] | None = None
+) -> Optional[Path]:
+    return _find_project_session_file(work_dir, ".codex-session", session=session, env=env)
 
 
 def _read_json(path: Path) -> dict:
@@ -152,8 +154,10 @@ class CodexProjectSession:
             _ = err
 
 
-def load_project_session(work_dir: Path) -> Optional[CodexProjectSession]:
-    session_file = find_project_session_file(work_dir)
+def load_project_session(
+    work_dir: Path, *, session: str | None = None, env: Mapping[str, str] | None = None
+) -> Optional[CodexProjectSession]:
+    session_file = find_project_session_file(work_dir, session=session, env=env)
     if not session_file:
         return None
     data = _read_json(session_file)

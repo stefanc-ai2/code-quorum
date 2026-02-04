@@ -912,6 +912,7 @@ class AILauncher:
                 upsert_registry(
                     {
                         "cq_session_id": self.session_id,
+                        "cq_session_name": self.cq_session_name,
                         "cq_project_id": compute_cq_project_id(self.project_root),
                         "work_dir": str(self.project_root),
                         "terminal": terminal or self.terminal_type,
@@ -1504,6 +1505,7 @@ class AILauncher:
         try:
             upsert_registry({
                 "cq_session_id": self.session_id,
+                "cq_session_name": self.cq_session_name,
                 "cq_project_id": compute_cq_project_id(self.project_root),
                 "work_dir": str(self.project_root),
                 "terminal": self.terminal_type,
@@ -1524,6 +1526,7 @@ class AILauncher:
             return False
         record = {
             "cq_session_id": self.session_id,
+            "cq_session_name": self.cq_session_name,
             "claude_pane_id": claude_pane_id,
             "codex_pane_id": codex_pane_id,
             "cq_project_id": compute_cq_project_id(self.project_root),

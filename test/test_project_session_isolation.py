@@ -28,6 +28,7 @@ def test_claude_session_isolated_from_env_cross_project(tmp_path: Path, monkeypa
     home = tmp_path / "home"
     home.mkdir(parents=True, exist_ok=True)
     monkeypatch.setenv("HOME", str(home))
+    monkeypatch.delenv("CQ_SESSION", raising=False)
     monkeypatch.delenv("CQ_ALLOW_CROSS_PROJECT_SESSION", raising=False)
 
     repo_a = tmp_path / "repo_a"
@@ -86,6 +87,7 @@ def test_claude_session_allow_cross_project_when_enabled(tmp_path: Path, monkeyp
     home = tmp_path / "home"
     home.mkdir(parents=True, exist_ok=True)
     monkeypatch.setenv("HOME", str(home))
+    monkeypatch.delenv("CQ_SESSION", raising=False)
     monkeypatch.setenv("CQ_ALLOW_CROSS_PROJECT_SESSION", "1")
 
     repo_a = tmp_path / "repo_a"
