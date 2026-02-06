@@ -30,7 +30,9 @@ Split-pane collaboration between **Claude** and **Codex** using **[WezTerm](http
 
 ## Install
 
-From a repo checkout:
+Install [WezTerm](https://wezterm.org/)
+
+Check out this CQ repo.
 
 ```bash
 ./install.sh install
@@ -51,19 +53,19 @@ Uninstall:
 
 ## Quickstart
 
-From your project directory (run inside WezTerm or tmux):
+Inside WezTerm, in your project directory:
 
 ```bash
-cq codex,claude
+cq claude codex
 ```
 
 `cq` opens/respawns panes and then exits.
 You should see new panes appear running Claude/Codex.
 
-Optional flags:
-- `cq -r codex,claude`: resume/continue prior provider context for this repo (if any)
-- `cq -a codex,claude`: auto-permission mode
-- `cq -ar codex,claude`: both (resume + auto)
+Flags:
+- `cq -r claude codex`: resume/continue prior provider context for this repo (if any)
+- `cq -a claude codex`: auto-permission mode
+- `cq -ar claude codex`: both (resume + auto)
 
 Send a message to a provider:
 
@@ -104,14 +106,14 @@ You may also see other installed commands/skills like `ask` and `mounted`. The t
 
 ## Multiple sessions in the same repo
 
-You can run multiple independent sessions in the same repo. If the default session is already running in this directory, re-running `cq codex,claude` will automatically start a new session (e.g. `default-2`) and print the chosen session name.
+You can run multiple independent sessions in the same repo. If the default session is already running in this directory, re-running `cq codex claude` will automatically start a new session (e.g. `default-2`) and print the chosen session name.
 
 To disable this behavior:
 
 ```bash
-cq --no-auto-session codex,claude
+cq --no-auto-session claude codex
 # or:
-CQ_AUTO_SESSION=0 cq codex,claude
+CQ_AUTO_SESSION=0 cq claude codex
 ```
 
 Inside a managed pane, `ask` automatically scopes to that session via `CQ_SESSION`:
@@ -134,9 +136,9 @@ Pane titles are also namespaced (used for pane rediscovery) to avoid collisions 
 - If you see an error about needing to run inside a supported terminal: run `cq` from inside WezTerm or tmux.
 - `.cq_config` auto-create is blocked: run `mkdir .cq_config` in your project directory (this typically happens when a parent directory already has a `.cq_config/`).
 - “Another cq instance is already running…”:
-  - To start a second independent session: re-run `cq codex,claude` and let it auto-pick `default-2`, `default-3`, … (it prints the chosen session name).
+  - To start a second independent session: re-run `cq codex claude` and let it auto-pick `default-2`, `default-3`, … (it prints the chosen session name).
   - To stop an existing session: close the panes for that session (or exit the provider CLIs running in them).
-- `ask` can’t find a session/pane: make sure you’re in the same repo/directory as the session, then start (or restart) panes with `cq codex` / `cq claude` (or `cq codex,claude`).
+- `ask` can’t find a session/pane: make sure you’re in the same repo/directory as the session, then start (or restart) panes with `cq codex` / `cq claude` (or `cq codex claude`).
 
 ## Development
 
