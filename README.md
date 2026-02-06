@@ -67,13 +67,11 @@ Flags:
 - `cq -a claude codex`: auto-permission mode
 - `cq -ar claude codex`: both (resume + auto)
 
-Send a message to a provider:
+Try a skill:
 
 ```bash
-ask codex "Review this diff and suggest improvements."
+$pair Create a hello world function in Rust. Just print, don't create a new file.
 ```
-
-`ask` exits immediately. Any response appears in the provider pane.
 
 ---
 
