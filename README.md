@@ -89,6 +89,19 @@ You may also see other installed commands/skills like `ask` and `mounted`. The t
 
 ---
 
+## Example screenshots
+
+<p align="center">
+  <img src="assets/screenshots/poll_start.png" width="49%" alt="Starting a poll in Code Quorum" />
+  <img src="assets/screenshots/poll_result.png" width="49%" alt="Poll results synthesized in Code Quorum" />
+</p>
+
+<p align="center">
+  <em>Left: starting a poll. Right: the synthesized result.</em>
+</p>
+
+---
+
 ## Multiple sessions in the same repo
 
 You can run multiple independent sessions in the same repo. If the default session is already running in this directory, re-running `cq codex,claude` will automatically start a new session (e.g. `default-2`) and print the chosen session name.
