@@ -16,7 +16,7 @@ Split-pane collaboration between **Claude** and **Codex** using **[WezTerm](http
 
 ## What it does
 
-- `cq` starts **Claude** and/or **Codex** in separate panes and writes per-project session files under `.cq_config/` (default) or `.cq_config/sessions/<name>/`.
+- `cq` starts **Claude** and/or **Codex** in separate panes and writes per-project session files under `.cq_config/`.
 - `ask` sends a message directly to the target pane (send-only, always async).
 - Replies come back **in the pane** via `ask --reply-to ...` (bidirectional “reply-via-ask”).
 
@@ -55,7 +55,7 @@ Uninstall:
 
 ## Quickstart
 
-From your project directory (run inside WezTerm; do this once per repo — `.cq_config/` is gitignored):
+From your project directory (run inside WezTerm or tmux; do this once per repo — `.cq_config/` is gitignored):
 
 ```bash
 mkdir -p .cq_config
@@ -64,12 +64,6 @@ cq codex,claude
 
 `cq` opens/respawns panes and then exits.
 You should see new panes appear running Claude/Codex.
-
-(Optional) Check what is mounted/reachable:
-
-```bash
-cq-mounted --json
-```
 
 Send a message to a provider:
 
@@ -124,32 +118,13 @@ These skills are installed for the providers and use the **reply-via-ask** patte
 | `pair` | Implement + review loop | Yes | Multi-turn: implement → review → merge (repeat) | Code changes + reviewer feedback | You want higher-quality changes fast |
 | `poll` | “Ask the room” Q&A | No | Multi-turn: broadcast → collect replies → synthesize | A consensus answer (or split) | You want quick independent opinions |
 
-You may also see utility skills/commands installed: `ask`, `mounted`, `ping`, and `cq-mounted` (CLI). The table above focuses on the multi-turn workflows.
-
-## Utilities
-
-- `cq-mounted --json`: show which providers are reachable for the current session (or `--all-sessions`).
-- `ping codex|claude`: Code Quorum reachability check for a provider pane (respects `CQ_SESSION`). (Not ICMP; if your shell finds the system `ping`, run the installed path or `./bin/ping` from a checkout.)
-- `cq kill [codex|claude]`: terminate sessions for the current directory/session (run inside the session pane, or prefix with `CQ_SESSION=...` from outside).
+You may also see other installed commands/skills like `ask` and `mounted`. The table above focuses on the multi-turn workflows.
 
 ---
 
-## Session isolation (repo A vs repo B)
+## Multiple sessions in the same repo
 
-By default, `ask` resolves sessions **only** for the current project via `.cq_config/` and will not talk to sessions from a different repository.
-
-## Multiple sessions (same repo)
-
-Use `--session` to run multiple independent `cq` launchers in the same directory:
-
-```bash
-cq --session feature-a codex,claude
-cq --session feature-b codex,claude
-```
-
-This namespaces the launcher lock per (cwd,session) and exports `CQ_SESSION` in managed panes.
-
-If you run `cq codex,claude` (no `--session`) and the default session is already running in this directory, `cq` will automatically start a new session (e.g. `default-2`) and print the chosen session name.
+You can run multiple independent sessions in the same repo. If the default session is already running in this directory, re-running `cq codex,claude` will automatically start a new session (e.g. `default-2`) and print the chosen session name.
 
 To disable this behavior:
 
@@ -159,18 +134,11 @@ cq --no-auto-session codex,claude
 CQ_AUTO_SESSION=0 cq codex,claude
 ```
 
-Inside a managed pane, `ask` and `cq-mounted` automatically scope to that session via `CQ_SESSION` (no `--session` needed):
+Inside a managed pane, `ask` automatically scopes to that session via `CQ_SESSION`:
 
 ```bash
-# From within the codex pane of feature-a:
+# From within a managed provider pane:
 ask claude "Any concerns with this approach?"
-cq-mounted --json
-```
-
-To send to a specific session from outside a managed pane:
-
-```bash
-ask --session feature-a codex "Review this diff"
 ```
 
 Provider session files for named sessions live under:
@@ -179,28 +147,15 @@ Provider session files for named sessions live under:
 
 Pane titles are also namespaced (used for pane rediscovery) to avoid collisions across sessions.
 
-To check what is currently mounted:
-
-```bash
-cq-mounted --json
-```
-
-To target a specific session or list all sessions:
-
-```bash
-cq-mounted --session feature-a --json
-cq-mounted --all-sessions --json
-```
-
 ---
 
 ## Troubleshooting
 
-- If you see an error about needing to run inside a supported terminal: run `cq` from inside WezTerm.
+- If you see an error about needing to run inside a supported terminal: run `cq` from inside WezTerm or tmux.
 - “Another cq instance is already running…”:
-  - To start a second independent session: `cq --session default-2 codex,claude` (or just re-run `cq codex,claude` and let it auto-pick `default-2`, `default-3`, …).
-  - To stop an existing session: run `cq kill` from inside that session’s pane (or use `CQ_SESSION=<name> cq kill` from outside).
-- `ask` can’t find a session/pane: run `cq-mounted --json` and `ping codex` / `ping claude` to confirm reachability, then start with `cq codex` / `cq claude` if needed.
+  - To start a second independent session: re-run `cq codex,claude` and let it auto-pick `default-2`, `default-3`, … (it prints the chosen session name).
+  - To stop an existing session: close the panes for that session (or exit the provider CLIs running in them).
+- `ask` can’t find a session/pane: make sure you’re in the same repo/directory as the session, then start (or restart) panes with `cq codex` / `cq claude` (or `cq codex,claude`).
 
 ## Development
 
