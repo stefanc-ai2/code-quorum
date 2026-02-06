@@ -59,7 +59,6 @@ Inside WezTerm, in your project directory:
 cq claude codex
 ```
 
-`cq` opens/respawns panes and then exits.
 You should see new panes appear running Claude/Codex.
 
 Flags:
