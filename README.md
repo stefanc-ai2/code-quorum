@@ -16,7 +16,7 @@ Split-pane collaboration between **Claude** and **Codex** using **[WezTerm](http
 
 - `cq` starts **Claude** and/or **Codex** in separate panes and writes per-project session files under `.cq_config/`.
 - `ask` sends a message directly to the target pane (send-only, always async).
-- Replies come back **in the pane** via `ask --reply-to ...` (bidirectional “reply-via-ask”).
+- Responses appear in the provider pane.
 
 ---
 
@@ -51,10 +51,9 @@ Uninstall:
 
 ## Quickstart
 
-From your project directory (run inside WezTerm or tmux; do this once per repo — `.cq_config/` is gitignored):
+From your project directory (run inside WezTerm or tmux):
 
 ```bash
-mkdir -p .cq_config
 cq codex,claude
 ```
 
@@ -72,46 +71,13 @@ Send a message to a provider:
 ask codex "Review this diff and suggest improvements."
 ```
 
-`ask` prints a request id (req_id) and exits immediately.
-
----
-
-## Bidirectional ask (reply-via-ask)
-
-If you want the recipient to reply back to the caller (useful for `/pair`, `/poll`, `/all-plan` flows), replies are sent as another `ask`:
-
-```bash
-# In the recipient pane (send back to the driver):
-ask codex --reply-to <REQ_ID> --caller claude "Here are my notes..."
-# (or)
-ask claude --reply-to <REQ_ID> --caller codex "Here are my notes..."
-```
-
-Tip: when you *expect* reply-via-ask, set a stable id with `--req-id`. `ask` includes a `CQ_REQ_ID: <id>` line at the top automatically so the recipient can copy it.
-
-```bash
-REQ_ID="$(python -c 'import secrets; print(secrets.token_hex(16))')"
-ask claude --req-id "$REQ_ID" <<EOF
-Review this and reply via:
-  ask codex --reply-to "$REQ_ID" --caller claude "<your notes>"
-EOF
-```
-
-The reply is wrapped with protocol markers so the caller can identify it:
-
-```
-CQ_REPLY: <REQ_ID>
-CQ_FROM: claude
-[CQ_RESULT] No reply required.
-
-...message...
-```
+`ask` exits immediately. Any response appears in the provider pane.
 
 ---
 
 ## Skills (workflows)
 
-These skills are installed for the providers and use the **reply-via-ask** pattern described above.
+These skills are installed for the providers and support multi-turn workflows across panes.
 
 | Skill | Primary purpose | Code changes? | Interaction | Output | Use when |
 |:------|------------------|--------------|------------|--------|----------|
@@ -153,6 +119,7 @@ Pane titles are also namespaced (used for pane rediscovery) to avoid collisions 
 ## Troubleshooting
 
 - If you see an error about needing to run inside a supported terminal: run `cq` from inside WezTerm or tmux.
+- `.cq_config` auto-create is blocked: run `mkdir .cq_config` in your project directory (this typically happens when a parent directory already has a `.cq_config/`).
 - “Another cq instance is already running…”:
   - To start a second independent session: re-run `cq codex,claude` and let it auto-pick `default-2`, `default-3`, … (it prints the chosen session name).
   - To stop an existing session: close the panes for that session (or exit the provider CLIs running in them).
