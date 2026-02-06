@@ -53,7 +53,7 @@ Uninstall:
 
 ## Quickstart
 
-Inside WezTerm, in your project directory:
+Inside WezTerm, go to your project directory:
 
 ```bash
 cq claude codex
