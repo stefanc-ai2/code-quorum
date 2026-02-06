@@ -7,7 +7,7 @@ metadata:
 
 # Pair Programming (Multi-Provider)
 
-Use a driver/navigator-style loop to get to a higher-quality implementation faster:
+Use a driver/reviewer-style loop to get to a higher-quality implementation faster:
 
 1. **Plan** (reuse prior `/all-plan` output if it exists)
 2. **Implement** (make the code changes)

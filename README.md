@@ -2,7 +2,7 @@
 
 # Code Quorum (`cq`)
 
-Split-pane collaboration between **Claude** and **Codex** using **tmux** or **WezTerm**.
+Split-pane collaboration between **Claude** and **Codex** using **[WezTerm](https://wezfurlong.org/wezterm/)**.
 
 [![License: Unlicense](https://img.shields.io/badge/license-Unlicense-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
@@ -27,9 +27,7 @@ No log tailing/monitoring is required or used.
 ## Requirements
 
 - Python **3.10+**
-- Either:
-  - tmux (run `tmux` first, then run `cq` inside tmux), or
-  - WezTerm (recommended)
+- A supported terminal: WezTerm (recommended) or tmux (not recommended)
 - The `claude` CLI and the `codex` CLI installed and on `PATH`
 
 ---
@@ -57,7 +55,7 @@ Uninstall:
 
 ## Quickstart
 
-From your project directory (run inside tmux or WezTerm; do this once per repo — `.cq_config/` is gitignored):
+From your project directory (run inside WezTerm; do this once per repo — `.cq_config/` is gitignored):
 
 ```bash
 mkdir -p .cq_config
@@ -198,7 +196,7 @@ cq-mounted --all-sessions --json
 
 ## Troubleshooting
 
-- `CQ must run inside tmux or WezTerm`: start `tmux` (then run `cq` inside it), or use WezTerm.
+- If you see an error about needing to run inside a supported terminal: run `cq` from inside WezTerm.
 - “Another cq instance is already running…”:
   - To start a second independent session: `cq --session default-2 codex,claude` (or just re-run `cq codex,claude` and let it auto-pick `default-2`, `default-3`, …).
   - To stop an existing session: run `cq kill` from inside that session’s pane (or use `CQ_SESSION=<name> cq kill` from outside).

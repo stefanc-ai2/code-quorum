@@ -2,7 +2,7 @@
 
 This workflow simulates pair programming with:
 - **You** = Driver (the provider that invoked `/pair`; edits code, runs tests, writes the final summary)
-- **Other mounted providers** = Navigators (critique, edge cases, alternative designs)
+- **Other mounted providers** = Reviewers (critique, edge cases, alternative designs)
 
 ## Inputs
 
@@ -57,7 +57,7 @@ Implement the plan with a bias toward:
 
 Run the most relevant local validations available (tests and/or build checks).
 
-## Step 3: Request navigator feedback (ask)
+## Step 3: Request reviewer feedback (ask)
 
 Send one request per reviewer.
 
@@ -71,7 +71,7 @@ Provide reviewers with:
 
 Template:
 ```
-You are my pair-programming navigator (reviewer).
+You are my pair-programming reviewer.
 Provide feedback only — do not invoke `/pair` and do not implement changes.
 
 When you're done, send your feedback back to me via reply-via-ask:
@@ -158,7 +158,7 @@ Use a shorter prompt that highlights what changed since the first review.
 ### Iteration 2 quick review template
 
 ```
-You are my pair-programming navigator (iteration 2).
+You are my pair-programming reviewer (iteration 2).
 Provide feedback only — do not invoke `/pair` and do not implement changes.
 
 When you're done, send your feedback back to me via reply-via-ask:
