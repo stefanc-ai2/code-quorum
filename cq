@@ -560,7 +560,18 @@ class AILauncher:
     def _pane_title_marker(self, provider: str) -> str:
         prov = (provider or "").strip().lower()
         prov_label = prov.capitalize() if prov else "Unknown"
-        return f"CQ-{self.cq_session_name}-{prov_label}-{self._short_run_id()}"
+        session_label = str(self.cq_session_name or "").strip() or DEFAULT_SESSION
+        if session_label == DEFAULT_SESSION:
+            try:
+                project_name = str(getattr(self, "project_root", Path.cwd()).name or "").strip()
+            except Exception:
+                project_name = ""
+            if project_name:
+                session_label = project_name
+
+        # Keep titles readable and safe across terminals.
+        session_label = re.sub(r"[^A-Za-z0-9_.-]+", "-", session_label).strip("-") or DEFAULT_SESSION
+        return f"CQ-{session_label}-{prov_label}-{self._short_run_id()}"
 
     def _set_current_pane_title_escape(self, title: str) -> None:
         """

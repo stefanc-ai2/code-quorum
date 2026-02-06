@@ -265,6 +265,18 @@ def test_pane_title_markers_are_unique_per_session(tmp_path: Path, monkeypatch) 
     assert b._pane_title_marker("codex") == "CQ-b-Codex-567890-99999"
 
 
+def test_default_session_pane_title_marker_uses_project_dir_name(tmp_path: Path, monkeypatch) -> None:
+    cq = _load_cq_module()
+    project_dir = tmp_path / "myproj"
+    project_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.chdir(project_dir)
+    (project_dir / ".cq_config").mkdir(parents=True, exist_ok=True)
+
+    launcher = cq.AILauncher(providers=["codex"], session_name="default")
+    launcher.session_id = "ai-1234567890-99999"
+    assert launcher._pane_title_marker("codex") == "CQ-myproj-Codex-567890-99999"
+
+
 def test_sessions_do_not_overwrite_session_files(monkeypatch, tmp_path: Path) -> None:
     cq = _load_cq_module()
     monkeypatch.chdir(tmp_path)
