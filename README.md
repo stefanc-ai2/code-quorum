@@ -8,8 +8,6 @@ Split-pane collaboration between **Claude** and **Codex** using **[WezTerm](http
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS-lightgrey.svg)]()
 
-**This repo is intentionally simplified:** no background daemons, no polling commands, no delegation tooling.
-
 </div>
 
 ---
@@ -19,8 +17,6 @@ Split-pane collaboration between **Claude** and **Codex** using **[WezTerm](http
 - `cq` starts **Claude** and/or **Codex** in separate panes and writes per-project session files under `.cq_config/`.
 - `ask` sends a message directly to the target pane (send-only, always async).
 - Replies come back **in the pane** via `ask --reply-to ...` (bidirectional “reply-via-ask”).
-
-No log tailing/monitoring is required or used.
 
 ---
 
@@ -168,16 +164,3 @@ Pane titles are also namespaced (used for pane rediscovery) to avoid collisions 
 python -m compileall -q lib bin cq test
 python -m pytest test/ -v --tb=short
 ```
-
----
-
-## WezTerm notes
-
-`ask` sends text to a pane and then injects **Enter** so the target TUI processes it. If you see text get pasted but not submitted, tune these env vars:
-
-- `CQ_WEZTERM_ENTER_METHOD=auto|key|text` (default: `auto`)
-  - `auto`: try `wezterm cli send-key Enter`, fall back to a raw CR byte
-  - `key`: force `send-key` only (no fallback)
-  - `text`: legacy mode (CR byte only)
-- `CQ_WEZTERM_ENTER_DELAY` (seconds): delay before injecting Enter
-- `CQ_WEZTERM_PASTE_DELAY` (seconds): delay between paste-mode send and Enter injection (multiline)
