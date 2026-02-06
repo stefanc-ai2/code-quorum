@@ -65,6 +65,11 @@ cq codex,claude
 `cq` opens/respawns panes and then exits.
 You should see new panes appear running Claude/Codex.
 
+Optional flags:
+- `cq -r codex,claude`: resume/continue prior provider context for this repo (if any)
+- `cq -a codex,claude`: auto-permission mode
+- `cq -ar codex,claude`: both (resume + auto)
+
 Send a message to a provider:
 
 ```bash
