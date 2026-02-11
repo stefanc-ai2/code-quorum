@@ -57,7 +57,18 @@ Implement the plan with a bias toward:
 
 Run the most relevant local validations available (tests and/or build checks).
 
-## Step 3: Request reviewer feedback (ask)
+## Step 3: Refactor and simplify (Driver cleanup pass)
+
+After coding is complete, do a focused cleanup/refactor pass before requesting review:
+- Remove unused imports, dead code, stale flags, and outdated comments introduced by the change.
+- DRY obvious duplication if it reduces complexity and doesn’t expand scope.
+- Re-read touched files with nearby/surrounding files to simplify interfaces and flow holistically.
+- Prefer deletion/simplification over adding abstractions.
+- Keep behavior stable; avoid unrelated refactors.
+
+Run quick validations again if cleanup changed behavior-sensitive code paths.
+
+## Step 4: Request reviewer feedback (ask)
 
 Send one request per reviewer.
 
@@ -97,7 +108,7 @@ Please review for:
 1) correctness/edge cases
 2) API/UX clarity (errors/messages)
 3) tests (what’s missing?)
-4) simplicity: could any of this be made simpler?
+4) refactor + simplification opportunities, including touched and surrounding files (unused code/imports, DRY, deletions)
 
 Reply with:
 - Must-fix issues
@@ -119,7 +130,7 @@ Notes:
 
 After sending review requests to all reviewers: **stop immediately**. Do not continue implementation or merging until feedback arrives via reply-via-ask.
 
-## Step 4: Collect feedback (reply-via-ask)
+## Step 5: Collect feedback (reply-via-ask)
 
 Reviewers will send feedback back to your pane via `ask --reply-to ... --caller <provider>`.
 
@@ -130,7 +141,7 @@ Each reply payload should include:
 This step is multi-turn. To get the feedback: end your turn and wait (do not run additional commands). Reviewers will send messages back to your terminal (driver pane) via `ask --reply-to`.
 Do not scrape panes to collect feedback (forbidden): no `wezterm cli get-text`, no `tmux capture-pane`, etc. The only supported mechanism is reply-via-ask.
 
-## Step 5: Digest and merge
+## Step 6: Digest and merge
 
 Convert feedback into an actionable list:
 
@@ -148,7 +159,7 @@ If reviewers disagree, default to the more conservative change or ask the user t
 
 After merging, re-run the relevant validations.
 
-## Step 6: Repeat once (iteration 2)
+## Step 7: Repeat once (iteration 2)
 
 Do a second pass with a different emphasis:
 - If iteration 1 focused on correctness, ask iteration 2 reviewers to focus on tests and maintainability (or vice-versa).
@@ -175,7 +186,7 @@ What changed since iteration 1:
 Please focus on:
 1) tests/coverage gaps
 2) maintainability/simpler alternatives
-3) simplification: could anything be deleted or made simpler?
+3) holistic simplification across touched and surrounding files: what can be refactored, deleted, or DRYed?
 
 Reply with Must-fix / Should-fix / Nice-to-have.
 ```
